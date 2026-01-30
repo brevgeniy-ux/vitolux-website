@@ -1,0 +1,27 @@
+import type { Category } from "./types";
+
+export const categories: Category[] = [
+  { id: "diesel-generators", name_uk: "Дизелові безшумні генератори для зовнішнього монтажу з повною автоматикою (Mitsubishi Heavy, Isuzu, Vitolux)", name_en: "Diesel silent generators for outdoor installation with full automation (Mitsubishi Heavy, Isuzu, Vitolux)" },
+  { id: "stabilizers", name_uk: "Стабілізатори для однофазного та трифазного струму та напруги від 1 kW до 250 kW", name_en: "Stabilizers for single-phase and three-phase current and voltage from 1 kW to 250 kW" },
+  { id: "inverters-ups", name_uk: "Інвертори (UPS) для опалення, пелетних котлів, сонячних систем і точного електрообладнання (чиста синусоїда, кольоровий LED‑дисплей)", name_en: "Inverters (UPS) for heating, pellet boilers, solar systems and precision electrical equipment (pure sine wave, colour LED display)" },
+  { id: "vitolux-generators", name_uk: "Генератори Vitolux – бензинові, дизельні, інверторні", name_en: "Vitolux generators – petrol, diesel, inverter" },
+  { id: "wood-splitters", name_uk: "Дровоколі та лінії для різання і колення деревини (професійні, електричні, дизельні, бензинові)", name_en: "Wood splitters and lines for cutting and splitting wood (professional, electric, diesel, petrol)" },
+  { id: "welding", name_uk: "Інверторні зварювальні апарати і зварювальна техніка VITO PROFESSIONAL", name_en: "Inverter welding machines and welding equipment VITO PROFESSIONAL" },
+  { id: "heat-pumps", name_uk: "Інверторні теплові насоси VITO класу A+++ для опалення, охолодження і гарячої води, а також вентиляторні конвектори з Wi‑Fi", name_en: "Inverter heat pumps VITO class A+++ for heating, cooling and hot water, plus fan convectors with Wi‑Fi" },
+  { id: "solar-generators", name_uk: "Сонячні генератори електроенергії без палива, електростанції для зберігання і віддачі енергії + сонячні панелі", name_en: "Solar electricity generators without fuel, power stations for storage and supply + solar panels" },
+  { id: "batteries", name_uk: "Літій‑іонні, AGM, GEL і CARBON тягові акумулятори 12V для сонячних і енергетичних систем, UPS та ін.", name_en: "Lithium-ion, AGM, GEL and CARBON traction batteries 12V for solar and energy systems, UPS etc." },
+  { id: "boilers", name_uk: "Нержавіючі та емальовані бойлери з однією/двома спіралями і буферні ємності для теплових насосів", name_en: "Stainless and enamel boilers with one/two coils and buffer tanks for heat pumps" },
+  { id: "compressors", name_uk: "Безшумні безмасляні, поршневі та акумуляторні повітряні компресори VITO PROFESSIONAL", name_en: "Silent oil-free, piston and cordless air compressors VITO PROFESSIONAL" },
+  { id: "decking-fencing", name_uk: "Декінг і алюмінієві огорожі, алюмінієві зовнішні двері", name_en: "Decking and aluminium fencing, aluminium exterior doors" },
+  { id: "meat-grinders", name_uk: "М'ясорубки, кутери і вакуумні тумблери для м'яса (професійні, з нержавіючої сталі)", name_en: "Meat grinders, cutters and vacuum tumblers for meat (professional, stainless steel)" },
+  { id: "stuffers", name_uk: "Наповнювачі з нержавіючої сталі – ручні, електричні, гідравлічні", name_en: "Stainless steel stuffers – manual, electric, hydraulic" },
+  { id: "slicers-mixers", name_uk: "Слайсери, спіральні міксери і мішалки для фаршу та м'яса з нержавіючої сталі", name_en: "Slicers, spiral mixers and meat/farce mixers in stainless steel" },
+  { id: "pumps-hydro", name_uk: "Інверторні і smart гідрофори, дренажні та свердловинні насоси VITO з повною автоматикою", name_en: "Inverter and smart hydrophores, drainage and borehole pumps VITO with full automation" },
+  { id: "frequency-converters", name_uk: "Частотні перетворювачі для керування електродвигунами 1–400 kW (Heavy Profi series)", name_en: "Frequency converters for motor control 1–400 kW (Heavy Profi series)" },
+  { id: "drilling-engines", name_uk: "Бензинові бурові двигуни VITO, мотоблоки і аксесуари", name_en: "Petrol drilling engines VITO, power tillers and accessories" },
+  { id: "massage-chairs", name_uk: "4D масажні крісла і стільці VITO (преміум клас)", name_en: "4D massage chairs and stools VITO (premium class)" },
+  { id: "juicers", name_uk: "Холоднопресові соковижималки", name_en: "Cold-press juicers" },
+  { id: "water-pumps-motors", name_uk: "Моторні водяні насоси і чотиритактні двигуни VITO", name_en: "Engine water pumps and four-stroke engines VITO" },
+  { id: "panic-buttons", name_uk: "SOS бездротові панік‑кнопки для готелів і wireless системи виклику", name_en: "SOS wireless panic buttons for hotels and wireless call systems" },
+  { id: "welding-helmets", name_uk: "Автоматичні сонячні зварювальні шоломи і окуляри, балони з технічними газами та витратні матеріали для зварювання", name_en: "Auto-darkening welding helmets and goggles, technical gas cylinders and welding consumables" },
+];
