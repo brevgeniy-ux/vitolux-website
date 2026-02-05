@@ -25,7 +25,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('admin_token')
-      window.location.href = '/admin/login'
+      window.location.href = '/login'
     }
     return Promise.reject(error)
   }
@@ -107,15 +107,15 @@ export interface DashboardStats {
 
 // Products API
 export const productsApi = {
-  getAll: () => apiClient.get('/admin/products'),
-  getById: (id: number) => apiClient.get(`/admin/products/${id}`),
-  create: (data: Partial<Product>) => apiClient.post('/admin/products', data),
-  update: (id: number, data: Partial<Product>) => apiClient.put(`/admin/products/${id}`, data),
-  delete: (id: number) => apiClient.delete(`/admin/products/${id}`),
+  getAll: () => apiClient.get('/products'),
+  getById: (id: number) => apiClient.get(`/products/${id}`),
+  create: (data: Partial<Product>) => apiClient.post('/products', data),
+  update: (id: number, data: Partial<Product>) => apiClient.put(`/products/${id}`, data),
+  delete: (id: number) => apiClient.delete(`/products/${id}`),
   uploadImage: (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    return apiClient.post('/admin/upload', formData, {
+    return apiClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
@@ -123,34 +123,34 @@ export const productsApi = {
 
 // Categories API
 export const categoriesApi = {
-  getAll: () => apiClient.get('/admin/categories'),
-  getById: (id: number) => apiClient.get(`/admin/categories/${id}`),
-  create: (data: Partial<Category>) => apiClient.post('/admin/categories', data),
-  update: (id: number, data: Partial<Category>) => apiClient.put(`/admin/categories/${id}`, data),
-  delete: (id: number) => apiClient.delete(`/admin/categories/${id}`),
+  getAll: () => apiClient.get('/categories'),
+  getById: (id: number) => apiClient.get(`/categories/${id}`),
+  create: (data: Partial<Category>) => apiClient.post('/categories', data),
+  update: (id: number, data: Partial<Category>) => apiClient.put(`/categories/${id}`, data),
+  delete: (id: number) => apiClient.delete(`/categories/${id}`),
 }
 
 // Orders API
 export const ordersApi = {
   getAll: (filters?: { status?: string }) => {
     const params = filters?.status ? { status: filters.status } : {}
-    return apiClient.get('/admin/orders', { params })
+    return apiClient.get('/orders', { params })
   },
-  getById: (id: number) => apiClient.get(`/admin/orders/${id}`),
+  getById: (id: number) => apiClient.get(`/orders/${id}`),
   updateStatus: (id: number, status: string, adminNotes?: string) => 
-    apiClient.put(`/admin/orders/${id}`, { status, admin_notes: adminNotes }),
+    apiClient.put(`/orders/${id}`, { status, admin_notes: adminNotes }),
 }
 
 // Settings API
 export const settingsApi = {
-  getAll: () => apiClient.get('/admin/settings'),
-  update: (data: Partial<Settings>) => apiClient.put('/admin/settings', data),
-  testTelegram: () => apiClient.post('/admin/settings/test-telegram'),
+  getAll: () => apiClient.get('/settings'),
+  update: (data: Partial<Settings>) => apiClient.put('/settings', data),
+  testTelegram: () => apiClient.post('/settings/test-telegram'),
 }
 
 // Dashboard API
 export const dashboardApi = {
-  getStats: () => apiClient.get('/admin/dashboard'),
+  getStats: () => apiClient.get('/dashboard'),
 }
 
 // Auth API
