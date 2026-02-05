@@ -1,0 +1,103 @@
+{
+  "common": {
+    "home": "Головна",
+    "catalog": "Каталог",
+    "cart": "Кошик",
+    "contacts": "Контакти",
+    "about": "Про нас",
+    "delivery": "Доставка",
+    "search": "Пошук",
+    "add_to_cart": "Додати в кошик",
+    "buy": "Купити",
+    "price": "Ціна",
+    "quantity": "Кількість",
+    "total": "Всього",
+    "remove": "Видалити",
+    "continue_shopping": "Продовжити покупки",
+    "checkout": "Оформити замовлення",
+    "order": "Замовлення",
+    "name": "Ім'я",
+    "phone": "Телефон",
+    "email": "Email",
+    "address": "Адреса",
+    "comment": "Коментар",
+    "submit": "Відправити",
+    "loading": "Завантаження...",
+    "error": "Помилка",
+    "success": "Успішно",
+    "close": "Закрити"
+  },
+  "home": {
+    "title": "VitoluxUA - Інтернет-магазин електрообладнання",
+    "slogan": "Широкий вибір електрообладнання від провідних виробників",
+    "popular_products": "Популярні товари",
+    "new_products": "Новинки",
+    "advantages": {
+      "title": "Чому обирають нас",
+      "quality": "Якість",
+      "quality_desc": "Тільки перевірені виробники",
+      "delivery": "Доставка",
+      "delivery_desc": "По всій Україні",
+      "support": "Підтримка",
+      "support_desc": "Консультації та сервіс",
+      "price": "Ціна",
+      "price_desc": "Конкурентні ціни"
+    }
+  },
+  "catalog": {
+    "title": "Каталог товарів",
+    "filters": "Фільтри",
+    "sort_by": "Сортувати за",
+    "sort_price_asc": "Ціна: від низької",
+    "sort_price_desc": "Ціна: від високої",
+    "sort_name": "Назва: А-Я",
+    "sort_new": "Новинки",
+    "sort_popular": "Популярні",
+    "view_grid": "Сітка",
+    "view_list": "Список",
+    "per_page": "На сторінці",
+    "in_stock": "В наявності",
+    "out_of_stock": "Немає в наявності",
+    "no_products": "Товари не знайдено"
+  },
+  "product": {
+    "sku": "Артикул",
+    "in_stock": "В наявності",
+    "out_of_stock": "Немає в наявності",
+    "description": "Опис",
+    "specifications": "Характеристики",
+    "similar_products": "Схожі товари"
+  },
+  "cart": {
+    "title": "Кошик",
+    "empty": "Кошик порожній",
+    "subtotal": "Підсумок",
+    "delivery": "Доставка",
+    "free_delivery": "Безкоштовна доставка від",
+    "total": "До сплати"
+  },
+  "checkout": {
+    "title": "Оформлення замовлення",
+    "step1": "Контактні дані",
+    "step2": "Доставка",
+    "step3": "Оплата",
+    "step4": "Підтвердження",
+    "delivery_pickup": "Самовивіз",
+    "delivery_nova_post": "Нова Пошта",
+    "delivery_ukr_post": "Укрпошта",
+    "delivery_courier": "Кур'єр",
+    "payment_cash": "Накладений платіж",
+    "payment_card": "На карту",
+    "payment_liqpay": "LiqPay",
+    "order_success": "Замовлення успішно оформлено!",
+    "order_number": "Номер замовлення"
+  },
+  "contacts": {
+    "title": "Контакти",
+    "form_title": "Написати нам",
+    "phone": "Телефон",
+    "email": "Email",
+    "address": "Адреса",
+    "working_hours": "Режим роботи"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "common": {
+    "home": "Home",
+    "catalog": "Catalog",
+    "cart": "Cart",
+    "contacts": "Contacts",
+    "about": "About",
+    "delivery": "Delivery",
+    "search": "Search",
+    "add_to_cart": "Add to cart",
+    "buy": "Buy",
+    "price": "Price",
+    "quantity": "Quantity",
+    "total": "Total",
+    "remove": "Remove",
+    "continue_shopping": "Continue shopping",
+    "checkout": "Checkout",
+    "order": "Order",
+    "name": "Name",
+    "phone": "Phone",
+    "email": "Email",
+    "address": "Address",
+    "comment": "Comment",
+    "submit": "Submit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "close": "Close"
+  },
+  "home": {
+    "title": "VitoluxUA - Electrical Equipment Online Store",
+    "slogan": "Wide selection of electrical equipment from leading manufacturers",
+    "popular_products": "Popular Products",
+    "new_products": "New Products",
+    "advantages": {
+      "title": "Why choose us",
+      "quality": "Quality",
+      "quality_desc": "Only verified manufacturers",
+      "delivery": "Delivery",
+      "delivery_desc": "Throughout Ukraine",
+      "support": "Support",
+      "support_desc": "Consultations and service",
+      "price": "Price",
+      "price_desc": "Competitive prices"
+    }
+  },
+  "catalog": {
+    "title": "Product Catalog",
+    "filters": "Filters",
+    "sort_by": "Sort by",
+    "sort_price_asc": "Price: Low to High",
+    "sort_price_desc": "Price: High to Low",
+    "sort_name": "Name: A-Z",
+    "sort_new": "New",
+    "sort_popular": "Popular",
+    "view_grid": "Grid",
+    "view_list": "List",
+    "per_page": "Per page",
+    "in_stock": "In stock",
+    "out_of_stock": "Out of stock",
+    "no_products": "No products found"
+  },
+  "product": {
+    "sku": "SKU",
+    "in_stock": "In stock",
+    "out_of_stock": "Out of stock",
+    "description": "Description",
+    "specifications": "Specifications",
+    "similar_products": "Similar Products"
+  },
+  "cart": {
+    "title": "Cart",
+    "empty": "Cart is empty",
+    "subtotal": "Subtotal",
+    "delivery": "Delivery",
+    "free_delivery": "Free delivery from",
+    "total": "Total"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "step1": "Contact Information",
+    "step2": "Delivery",
+    "step3": "Payment",
+    "step4": "Confirmation",
+    "delivery_pickup": "Pickup",
+    "delivery_nova_post": "Nova Post",
+    "delivery_ukr_post": "Ukrposhta",
+    "delivery_courier": "Courier",
+    "payment_cash": "Cash on delivery",
+    "payment_card": "Card",
+    "payment_liqpay": "LiqPay",
+    "order_success": "Order successfully placed!",
+    "order_number": "Order number"
+  },
+  "contacts": {
+    "title": "Contacts",
+    "form_title": "Contact us",
+    "phone": "Phone",
+    "email": "Email",
+    "address": "Address",
+    "working_hours": "Working hours"
+  }
+}

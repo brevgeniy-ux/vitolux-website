@@ -1,0 +1,5 @@
+<svg width="200" height="60" xmlns="http://www.w3.org/2000/svg">
+  <text x="10" y="40" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#2563EB">VITOLUX</text>
+  <text x="150" y="40" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#F59E0B">UA</text>
+  <path d="M180 10 L195 10 L187.5 25 Z" fill="#F59E0B"/>
+</svg>
