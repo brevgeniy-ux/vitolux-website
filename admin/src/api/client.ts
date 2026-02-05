@@ -87,7 +87,7 @@ export interface Settings {
   site_name: string
   site_phone: string
   site_email: string
-  telegram_bot_token: string
+  .get('/telegram_bot_token: string
   telegram_chat_id: string
   telegram_notifications_enabled: string
   free_delivery_threshold: string
@@ -107,8 +107,8 @@ export interface DashboardStats {
 
 // Products API
 export const productsApi = {
-  getAll: () => apiClient.get('/admin/products'),
-  getById: (id: number) => apiClient.get(`/admin/products/${id}`),
+  getAll: () => apiClient.get('/products'),
+  getById: (id: number) => apiClient.get(`/products/${id}`),
   create: (data: Partial<Product>) => apiClient.post('/admin/products', data),
   update: (id: number, data: Partial<Product>) => apiClient.put(`/admin/products/${id}`, data),
   delete: (id: number) => apiClient.delete(`/admin/products/${id}`),
@@ -123,8 +123,8 @@ export const productsApi = {
 
 // Categories API
 export const categoriesApi = {
-  getAll: () => apiClient.get('/admin/categories'),
-  getById: (id: number) => apiClient.get(`/admin/categories/${id}`),
+  getAll: () => apiClient.get('/categories'),
+  getById: (id: number) => apiClient.get(`/categories/${id}`),
   create: (data: Partial<Category>) => apiClient.post('/admin/categories', data),
   update: (id: number, data: Partial<Category>) => apiClient.put(`/admin/categories/${id}`, data),
   delete: (id: number) => apiClient.delete(`/admin/categories/${id}`),
@@ -134,16 +134,16 @@ export const categoriesApi = {
 export const ordersApi = {
   getAll: (filters?: { status?: string }) => {
     const params = filters?.status ? { status: filters.status } : {}
-    return apiClient.get('/admin/orders', { params })
+    return apiClient.get('/orders', { params })
   },
-  getById: (id: number) => apiClient.get(`/admin/orders/${id}`),
+  getById: (id: number) => apiClient.get(`/orders/${id}`),
   updateStatus: (id: number, status: string, adminNotes?: string) => 
     apiClient.put(`/admin/orders/${id}`, { status, admin_notes: adminNotes }),
 }
 
 // Settings API
 export const settingsApi = {
-  getAll: () => apiClient.get('/admin/settings'),
+  getAll: () => apiClient.get('/settings'),
   update: (data: Partial<Settings>) => apiClient.put('/admin/settings', data),
   testTelegram: () => apiClient.post('/settings/test-telegram'),
 }
