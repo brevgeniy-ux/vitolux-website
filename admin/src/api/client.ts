@@ -105,52 +105,52 @@ export interface DashboardStats {
   top_products: any[]
 }
 
-// Products API
+// Products API — GET без /admin, POST/PUT/DELETE с /admin
 export const productsApi = {
-  getAll: () => apiClient.get('/admin/products'),
-  getById: (id: number) => apiClient.get(`/admin/products/${id}`),
+  getAll: () => apiClient.get('/products'),
+  getById: (id: number) => apiClient.get(`/products/${id}`),
   create: (data: Partial<Product>) => apiClient.post('/admin/products', data),
   update: (id: number, data: Partial<Product>) => apiClient.put(`/admin/products/${id}`, data),
   delete: (id: number) => apiClient.delete(`/admin/products/${id}`),
-  uploadImage: (file: File) => {
+  uploadImage: (productId: number, file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    return apiClient.post('/admin/upload', formData, {
+    return apiClient.post(`/admin/products/${productId}/images`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
 }
 
-// Categories API
+// Categories API — GET без /admin, POST/PUT/DELETE с /admin
 export const categoriesApi = {
-  getAll: () => apiClient.get('/admin/categories'),
-  getById: (id: number) => apiClient.get(`/admin/categories/${id}`),
+  getAll: () => apiClient.get('/categories'),
+  getById: (id: number) => apiClient.get(`/categories/${id}`),
   create: (data: Partial<Category>) => apiClient.post('/admin/categories', data),
   update: (id: number, data: Partial<Category>) => apiClient.put(`/admin/categories/${id}`, data),
   delete: (id: number) => apiClient.delete(`/admin/categories/${id}`),
 }
 
-// Orders API
+// Orders API — GET без /admin, PUT с /admin
 export const ordersApi = {
   getAll: (filters?: { status?: string }) => {
     const params = filters?.status ? { status: filters.status } : {}
-    return apiClient.get('/admin/orders', { params })
+    return apiClient.get('/orders', { params })
   },
-  getById: (id: number) => apiClient.get(`/admin/orders/${id}`),
-  updateStatus: (id: number, status: string, adminNotes?: string) => 
+  getById: (id: number) => apiClient.get(`/orders/${id}`),
+  updateStatus: (id: number, status: string, adminNotes?: string) =>
     apiClient.put(`/admin/orders/${id}`, { status, admin_notes: adminNotes }),
 }
 
-// Settings API
+// Settings API — GET без /admin, POST/PUT с /admin
 export const settingsApi = {
-  getAll: () => apiClient.get('/admin/settings'),
+  getAll: () => apiClient.get('/settings'),
   update: (data: Partial<Settings>) => apiClient.put('/admin/settings', data),
   testTelegram: () => apiClient.post('/admin/settings/test-telegram'),
 }
 
-// Dashboard API
+// Dashboard API — с /admin
 export const dashboardApi = {
-  getStats: () => apiClient.get('/admin/dashboard'),
+  getStats: () => apiClient.get('/admin/dashboard/stats'),
 }
 
 // Auth API

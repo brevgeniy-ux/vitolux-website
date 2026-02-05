@@ -27,6 +27,7 @@ export default function ProductModal({ isOpen, onClose, productId, onSuccess }: 
     image: '',
   })
   const [imagePreview, setImagePreview] = useState<string>('')
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -89,19 +90,27 @@ export default function ProductModal({ isOpen, onClose, productId, onSuccess }: 
       image: '',
     })
     setImagePreview('')
+    setPendingFile(null)
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    try {
-      const res = await productsApi.uploadImage(file)
-      setFormData({ ...formData, image: res.data.url })
-      setImagePreview(res.data.url)
-      toast.success('Зображення завантажено')
-    } catch (error) {
-      toast.error('Помилка завантаження зображення')
+    if (productId) {
+      try {
+        const res = await productsApi.uploadImage(productId, file)
+        const url = res.data.url ?? res.data.data?.url
+        setFormData({ ...formData, image: url })
+        setImagePreview(url)
+        toast.success('Зображення завантажено')
+      } catch (error) {
+        toast.error('Помилка завантаження зображення')
+      }
+    } else {
+      setPendingFile(file)
+      setImagePreview(URL.createObjectURL(file))
+      toast.success('Зображення буде завантажено після збереження товару')
     }
   }
 
@@ -122,10 +131,15 @@ export default function ProductModal({ isOpen, onClose, productId, onSuccess }: 
         await productsApi.update(productId, data)
         toast.success('Товар оновлено')
       } else {
-        await productsApi.create(data)
+        const createRes = await productsApi.create(data)
+        const newId = createRes.data.id ?? createRes.data.data?.id
+        if (newId && pendingFile) {
+          await productsApi.uploadImage(newId, pendingFile)
+        }
         toast.success('Товар створено')
       }
 
+      setPendingFile(null)
       onSuccess()
       onClose()
       resetForm()
