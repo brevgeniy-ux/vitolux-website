@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { categoriesApi, Category } from '../api/client'
+import { categoriesApi } from '../api/client'
 import toast from 'react-hot-toast'
 
 interface CategoryModalProps {

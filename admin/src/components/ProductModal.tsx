@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { productsApi, categoriesApi, Product, Category } from '../api/client'
+import { productsApi, categoriesApi, Category } from '../api/client'
 import toast from 'react-hot-toast'
 
 interface ProductModalProps {
@@ -113,9 +113,9 @@ export default function ProductModal({ isOpen, onClose, productId, onSuccess }: 
       const data = {
         ...formData,
         price: parseFloat(formData.price) || 0,
-        old_price: formData.old_price ? parseFloat(formData.old_price) : null,
+        old_price: formData.old_price ? parseFloat(formData.old_price) : undefined,
         quantity: parseInt(formData.quantity) || 0,
-        category_id: formData.category_id ? parseInt(formData.category_id) : null,
+        category_id: formData.category_id ? parseInt(formData.category_id) : undefined,
       }
 
       if (productId) {

@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { productsApi, Product } from '../api/client'
-import ProductModal from '../components/ProductModal'
 import toast from 'react-hot-toast'
 
 export default function ProductsPage() {
   const navigate = useNavigate()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingProductId, setEditingProductId] = useState<number | undefined>()
 
   useEffect(() => {
     loadProducts()
