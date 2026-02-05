@@ -10,6 +10,7 @@ import AboutPage from './pages/AboutPage'
 import DeliveryPage from './pages/DeliveryPage'
 import ContactsPage from './pages/ContactsPage'
 import SearchPage from './pages/SearchPage'
+import OrderSuccessPage from './pages/OrderSuccessPage'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/product/:slug" element={<ProductPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/order-success/:orderNumber" element={<OrderSuccessPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
           <Route path="/contacts" element={<ContactsPage />} />

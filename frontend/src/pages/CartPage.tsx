@@ -1,11 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
-import { useLanguageStore } from '../store/languageStore'
 
 export default function CartPage() {
   const { t, i18n } = useTranslation()
-  const { items, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
+  const { items, removeItem, updateQuantity, getTotal } = useCartStore()
   const locale = i18n.language
 
   const getProductName = (product: any) => {

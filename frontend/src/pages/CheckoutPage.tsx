@@ -10,6 +10,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate()
   const { items, getTotal, clearCart } = useCartStore()
   const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
@@ -17,6 +18,7 @@ export default function CheckoutPage() {
     customer_comment: '',
     delivery_type: 'pickup' as 'pickup' | 'nova_post' | 'ukr_post' | 'courier',
     delivery_data: {},
+    delivery_address: '',
     payment_type: 'cash_on_delivery' as 'cash_on_delivery' | 'card' | 'liqpay',
   })
 
@@ -25,21 +27,37 @@ export default function CheckoutPage() {
   const total = subtotal + deliveryPrice
 
   const handleSubmit = async () => {
+    if (!formData.customer_name || !formData.customer_phone) {
+      toast.error('Заповніть обов\'язкові поля')
+      return
+    }
+
+    setLoading(true)
     try {
-      const order = {
+      const orderItems = items.map(item => ({
+        product_id: item.product.id,
+        name: item.product.name_uk || item.product.name_en,
+        price: item.product.price,
+        quantity: item.quantity,
+      }))
+
+      const orderData = {
         ...formData,
-        items: items.map(item => ({
-          product_id: item.product.id,
-          quantity: item.quantity,
-        })),
+        items: orderItems,
+        subtotal,
+        delivery_cost: deliveryPrice,
+        total,
       }
 
-      const res = await ordersApi.create(order)
-      toast.success(t('checkout.order_success'))
+      const res = await ordersApi.create(orderData)
+      
+      toast.success(`Замовлення #${res.data.order_number} успішно оформлено!`)
       clearCart()
       navigate(`/order-success/${res.data.order_number}`)
     } catch (error: any) {
-      toast.error(error.response?.data?.message || t('common.error'))
+      toast.error(error.response?.data?.error || 'Помилка оформлення замовлення')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -52,7 +70,9 @@ export default function CheckoutPage() {
         <div className="flex items-center justify-between">
           {[1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center flex-1">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step >= s ? 'bg-primary text-white' : 'bg-gray-300'}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                step >= s ? 'bg-primary text-white' : 'bg-gray-300'
+              }`}>
                 {s}
               </div>
               {s < 4 && <div className={`flex-1 h-1 ${step > s ? 'bg-primary' : 'bg-gray-300'}`} />}
@@ -89,13 +109,12 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 font-semibold">{t('common.email')} *</label>
+                  <label className="block mb-2 font-semibold">{t('common.email')}</label>
                   <input
                     type="email"
                     value={formData.customer_email}
                     onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
                     className="w-full border rounded p-2"
-                    required
                   />
                 </div>
                 <div>
@@ -109,7 +128,7 @@ export default function CheckoutPage() {
                 </div>
                 <button
                   onClick={() => setStep(2)}
-                  disabled={!formData.customer_name || !formData.customer_phone || !formData.customer_email}
+                  disabled={!formData.customer_name || !formData.customer_phone}
                   className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition disabled:opacity-50"
                 >
                   Далі
@@ -135,6 +154,18 @@ export default function CheckoutPage() {
                     <span>{t(`checkout.delivery_${type}`)}</span>
                   </label>
                 ))}
+                {formData.delivery_type !== 'pickup' && (
+                  <div>
+                    <label className="block mb-2 font-semibold">Адреса доставки</label>
+                    <textarea
+                      value={formData.delivery_address}
+                      onChange={(e) => setFormData({ ...formData, delivery_address: e.target.value })}
+                      className="w-full border rounded p-2"
+                      rows={3}
+                      placeholder="Введіть адресу доставки"
+                    />
+                  </div>
+                )}
                 <div className="flex space-x-4">
                   <button onClick={() => setStep(1)} className="flex-1 border py-2 rounded">
                     Назад
@@ -182,16 +213,25 @@ export default function CheckoutPage() {
               <div className="space-y-4 mb-6">
                 <p><strong>{t('common.name')}:</strong> {formData.customer_name}</p>
                 <p><strong>{t('common.phone')}:</strong> {formData.customer_phone}</p>
-                <p><strong>{t('common.email')}:</strong> {formData.customer_email}</p>
+                {formData.customer_email && (
+                  <p><strong>{t('common.email')}:</strong> {formData.customer_email}</p>
+                )}
                 <p><strong>{t('checkout.step2')}:</strong> {t(`checkout.delivery_${formData.delivery_type}`)}</p>
+                {formData.delivery_address && (
+                  <p><strong>Адреса:</strong> {formData.delivery_address}</p>
+                )}
                 <p><strong>{t('checkout.step3')}:</strong> {t(`checkout.payment_${formData.payment_type.split('_')[0]}`)}</p>
               </div>
               <div className="flex space-x-4">
                 <button onClick={() => setStep(3)} className="flex-1 border py-2 rounded">
                   Назад
                 </button>
-                <button onClick={handleSubmit} className="flex-1 bg-primary text-white py-2 rounded">
-                  {t('common.submit')}
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="flex-1 bg-primary text-white py-2 rounded disabled:opacity-50"
+                >
+                  {loading ? 'Відправка...' : t('common.submit')}
                 </button>
               </div>
             </div>

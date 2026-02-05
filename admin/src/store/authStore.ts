@@ -26,20 +26,21 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       login: async (email, password) => {
         const res = await apiClient.post('/login', { email, password })
+        const token = res.data.token
+        localStorage.setItem('admin_token', token)
         set({
           user: res.data.user,
-          token: res.data.token,
+          token: token,
           isAuthenticated: true,
         })
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`
       },
       logout: () => {
+        localStorage.removeItem('admin_token')
         set({ user: null, token: null, isAuthenticated: false })
-        delete apiClient.defaults.headers.common['Authorization']
       },
       setAuth: (user, token) => {
+        localStorage.setItem('admin_token', token)
         set({ user, token, isAuthenticated: true })
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
       },
     }),
     {

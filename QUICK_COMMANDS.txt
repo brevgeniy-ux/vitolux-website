@@ -1,0 +1,44 @@
+# Быстрые команды для выполнения на сервере
+
+# Подключение к серверу:
+ssh shmfjhml@rocket-da6.hostsila.org -p 22
+# Пароль: j2Z2ZHqyp.4T]6
+
+# После подключения выполните:
+cd /home/shmfjhml/domains/vitoluxua.com/public_html
+bash configure-server.sh
+
+# ИЛИ выполните команды вручную:
+
+cd /home/shmfjhml/domains/vitoluxua.com/public_html/
+cp .env.example .env
+cat > .env << 'EOF'
+APP_NAME=VitoluxUA
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://vitoluxua.com
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=shmfjhml_vitolux
+DB_USERNAME=shmfjhml_vitolux
+DB_PASSWORD=j2Z2ZHqyp.4T]6
+SESSION_DRIVER=database
+CACHE_STORE=database
+QUEUE_CONNECTION=database
+SANCTUM_STATEFUL_DOMAINS=vitoluxua.com
+SESSION_DOMAIN=vitoluxua.com
+EOF
+composer install --optimize-autoloader --no-dev
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed
+php artisan storage:link
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+chmod -R 755 storage bootstrap/cache
+
+# Проверка:
+# https://vitoluxua.com
+# https://vitoluxua.com/admin (admin@vitoluxua.com / admin123)

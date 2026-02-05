@@ -1,0 +1,40 @@
+# .htaccess для корня public_html
+# Этот файл должен быть в /home/shmfjhml/domains/vitoluxua.com/public_html/
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # API routes - перенаправляем на Laravel
+    RewriteCond %{REQUEST_URI} ^/api
+    RewriteRule ^api/(.*)$ public/index.php [L]
+
+    # Admin routes - перенаправляем на admin/index.html
+    RewriteCond %{REQUEST_URI} ^/admin
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^admin/(.*)$ admin/index.html [L]
+
+    # Frontend routes - перенаправляем на index.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/api
+    RewriteCond %{REQUEST_URI} !^/admin
+    RewriteRule ^(.*)$ index.html [L]
+</IfModule>
+
+# Защита .env файла
+<Files .env>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Кеширование статических файлов
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+</IfModule>

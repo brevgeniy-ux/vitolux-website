@@ -1,0 +1,18 @@
+cd /home/shmfjhml/domains/vitoluxua.com/public_html
+lcd backend
+put -r app
+put -r bootstrap
+put -r config
+put -r database
+put -r public
+put -r routes
+put -r storage
+put artisan
+put composer.json
+put .env.example
+lcd ../frontend/dist
+put -r .
+lcd ../../admin/dist
+cd admin
+put -r .
+quit
