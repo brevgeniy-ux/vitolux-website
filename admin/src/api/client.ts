@@ -150,7 +150,7 @@ export const settingsApi = {
 
 // Dashboard API
 export const dashboardApi = {
-  getStats: () => apiClient.get('/dashboard'),
+  getStats: () => apiClient.get('/admin/dashboard/stats'),
 }
 
 // Auth API
