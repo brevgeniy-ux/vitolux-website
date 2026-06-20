@@ -1,0 +1,125 @@
+//@version=5
+// =============================================================================
+// UT Bot Strategy (доработанная версия индикатора "UT Bot Alerts")
+// -----------------------------------------------------------------------------
+// Полноценная торговая стратегия на базе ATR-трейлинг-стопа UT Bot.
+// Что исправлено относительно оригинального индикатора:
+//   1. study() -> strategy(): появились реальные входы/выходы и бэктест.
+//   2. Убрана бессмысленная ema(src, 1) (== src). Кроссовер считается напрямую.
+//   3. Добавлен риск-менеджмент: ATR-стоп, тейк по R:R, опциональный трейлинг.
+//   4. Добавлены фильтры: тренд по EMA, фильтр диапазона дат, торговля
+//      только на закрытии бара (защита от перерисовки).
+//   5. Корректные ограничения входных параметров (minval) и исправлена опечатка.
+//   6. Контроль размера позиции через настройки strategy().
+// =============================================================================
+
+strategy(
+     title              = "UT Bot Strategy",
+     overlay            = true,
+     initial_capital    = 10000,
+     default_qty_type   = strategy.percent_of_equity,
+     default_qty_value  = 10,
+     commission_type    = strategy.commission.percent,
+     commission_value   = 0.05,
+     slippage           = 2,
+     pyramiding         = 0,
+     calc_on_order_fills = false,
+     process_orders_on_close = true)
+
+// ------------------------------- Inputs -------------------------------------
+grpUT = "UT Bot"
+keyValue   = input.float(1.0, title = "Key Value (чувствительность)", minval = 0.1, step = 0.1, group = grpUT)
+atrPeriod  = input.int(10,    title = "ATR Period", minval = 1, group = grpUT)
+useHA      = input.bool(false, title = "Сигналы по Heikin Ashi (внимание: возможна перерисовка)", group = grpUT)
+
+grpFilter = "Фильтры"
+useTrendFilter = input.bool(true, title = "Фильтр тренда по EMA", group = grpFilter)
+trendLen       = input.int(200, title = "EMA фильтра тренда", minval = 1, group = grpFilter)
+tradeDir       = input.string("Both", title = "Разрешённое направление", options = ["Both", "Long", "Short"], group = grpFilter)
+
+grpRisk = "Риск-менеджмент"
+useStop     = input.bool(true, title = "Стоп-лосс (ATR)", group = grpRisk)
+atrStopMult = input.float(2.0, title = "Множитель ATR для стопа", minval = 0.1, step = 0.1, group = grpRisk)
+useTP       = input.bool(true, title = "Тейк-профит (R:R)", group = grpRisk)
+rrRatio     = input.float(2.0, title = "Risk:Reward", minval = 0.1, step = 0.1, group = grpRisk)
+useTrail    = input.bool(false, title = "Трейлинг-стоп по UT линии", group = grpRisk)
+
+grpDate = "Диапазон дат бэктеста"
+useDateFilter = input.bool(false, title = "Включить фильтр дат", group = grpDate)
+startDate = input.time(timestamp("2020-01-01 00:00"), title = "С", group = grpDate)
+endDate   = input.time(timestamp("2026-01-01 00:00"), title = "По", group = grpDate)
+
+// --------------------------- Источник цены ----------------------------------
+// Heikin Ashi через request.security оставлен опциональным, lookahead = off,
+// gaps = off, чтобы минимизировать (но не полностью убрать) перерисовку.
+haTicker = ticker.heikinashi(syminfo.tickerid)
+src = useHA ? request.security(haTicker, timeframe.period, close, lookahead = barmerge.lookahead_off) : close
+
+// --------------------------- UT Bot core ------------------------------------
+xATR  = ta.atr(atrPeriod)
+nLoss = keyValue * xATR
+
+var float xATRTrailingStop = 0.0
+xATRTrailingStop := if src > nz(xATRTrailingStop[1], 0) and src[1] > nz(xATRTrailingStop[1], 0)
+    math.max(nz(xATRTrailingStop[1]), src - nLoss)
+else if src < nz(xATRTrailingStop[1], 0) and src[1] < nz(xATRTrailingStop[1], 0)
+    math.min(nz(xATRTrailingStop[1]), src + nLoss)
+else if src > nz(xATRTrailingStop[1], 0)
+    src - nLoss
+else
+    src + nLoss
+
+var int pos = 0
+pos := if src[1] < nz(xATRTrailingStop[1], 0) and src > nz(xATRTrailingStop[1], 0)
+    1
+else if src[1] > nz(xATRTrailingStop[1], 0) and src < nz(xATRTrailingStop[1], 0)
+    -1
+else
+    nz(pos[1], 0)
+
+// Кроссоверы считаем напрямую по src (ema(src,1) удалена как избыточная).
+above = ta.crossover(src, xATRTrailingStop)
+below = ta.crossunder(src, xATRTrailingStop)
+
+buy  = src > xATRTrailingStop and above
+sell = src < xATRTrailingStop and below
+
+// ------------------------------ Фильтры -------------------------------------
+trendEma  = ta.ema(close, trendLen)
+longOk  = (not useTrendFilter or close > trendEma) and tradeDir != "Short"
+shortOk = (not useTrendFilter or close < trendEma) and tradeDir != "Long"
+inDateRange = not useDateFilter or (time >= startDate and time <= endDate)
+
+// ------------------------------ Визуал --------------------------------------
+plot(xATRTrailingStop, title = "UT Trailing Stop", color = pos == 1 ? color.green : pos == -1 ? color.red : color.blue, linewidth = 1)
+plot(useTrendFilter ? trendEma : na, title = "Trend EMA", color = color.orange)
+
+plotshape(buy and longOk and inDateRange,  title = "Buy",  text = "Buy",  style = shape.labelup,   location = location.belowbar, color = color.green, textcolor = color.white, size = size.tiny)
+plotshape(sell and shortOk and inDateRange, title = "Sell", text = "Sell", style = shape.labeldown, location = location.abovebar, color = color.red,   textcolor = color.white, size = size.tiny)
+
+// ------------------------------ Сделки --------------------------------------
+longSignal  = buy  and longOk  and inDateRange
+shortSignal = sell and shortOk and inDateRange
+
+if longSignal
+    strategy.entry("Long", strategy.long)
+if shortSignal
+    strategy.entry("Short", strategy.short)
+
+// Стоп-лосс / тейк-профит рассчитываются от цены входа.
+longStop  = strategy.position_avg_price - atrStopMult * xATR
+shortStop = strategy.position_avg_price + atrStopMult * xATR
+longTP    = strategy.position_avg_price + atrStopMult * xATR * rrRatio
+shortTP   = strategy.position_avg_price - atrStopMult * xATR * rrRatio
+
+if strategy.position_size > 0
+    stopPrice = useTrail ? math.max(useStop ? longStop : na, xATRTrailingStop) : (useStop ? longStop : na)
+    strategy.exit("Long Exit", from_entry = "Long", stop = stopPrice, limit = useTP ? longTP : na)
+
+if strategy.position_size < 0
+    stopPrice = useTrail ? math.min(useStop ? shortStop : na, xATRTrailingStop) : (useStop ? shortStop : na)
+    strategy.exit("Short Exit", from_entry = "Short", stop = stopPrice, limit = useTP ? shortTP : na)
+
+// ------------------------------ Алерты --------------------------------------
+alertcondition(longSignal,  "UT Long",  "UT Bot: Long")
+alertcondition(shortSignal, "UT Short", "UT Bot: Short")
