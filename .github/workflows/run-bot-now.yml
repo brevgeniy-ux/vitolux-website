@@ -1,0 +1,47 @@
+name: Run alert bot now
+
+on:
+  workflow_dispatch:
+    inputs:
+      bot_token:
+        description: "BOT_TOKEN Telegram-бота"
+        required: true
+      alerts_token:
+        description: "ALERTS_IN_UA_TOKEN (необязательно)"
+        required: false
+        default: ""
+      minutes:
+        description: "Сколько минут держать бота живым (макс ~330)"
+        required: false
+        default: "300"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/ukraine-air-alert-bot-9zi8yy
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        working-directory: alert-bot
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        working-directory: alert-bot
+        env:
+          BOT_TOKEN: ${{ inputs.bot_token }}
+          ALERTS_IN_UA_TOKEN: ${{ inputs.alerts_token }}
+          MINUTES: ${{ inputs.minutes }}
+        run: |
+          echo "::add-mask::$BOT_TOKEN"
+          [ -n "$ALERTS_IN_UA_TOKEN" ] && echo "::add-mask::$ALERTS_IN_UA_TOKEN"
+          SECONDS_LIMIT=$(( MINUTES * 60 ))
+          echo "Запускаю бота на $MINUTES минут..."
+          timeout --signal=INT ${SECONDS_LIMIT}s python bot.py || true
+          echo "Время вышло, бот остановлен."
