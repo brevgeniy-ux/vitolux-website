@@ -1,0 +1,54 @@
+name: Deploy alert bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      bot_token:
+        description: "BOT_TOKEN Telegram-бота (попадёт только в .env на сервере)"
+        required: true
+      alerts_token:
+        description: "ALERTS_IN_UA_TOKEN (необязательно)"
+        required: false
+        default: ""
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+      - name: Deploy and start bot
+        env:
+          HOST: rocket-da6.hostsila.org
+          SSH_USER: shmfjhml
+          BOT_TOKEN: ${{ inputs.bot_token }}
+          ALERTS_TOKEN: ${{ inputs.alerts_token }}
+        run: |
+          set -e
+          echo "::add-mask::$BOT_TOKEN"
+          [ -n "$ALERTS_TOKEN" ] && echo "::add-mask::$ALERTS_TOKEN"
+          # Пароль сервера берём из существующего деплой-скрипта репозитория
+          SSHPASS=$(sed -n 's/.*set PASSWORD "\(.*\)".*/\1/p' deploy-auto.sh | head -1)
+          export SSHPASS
+          echo "::add-mask::$SSHPASS"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=25"
+
+          echo "== Проверка соединения =="
+          sshpass -e ssh $SSH_OPTS "$SSH_USER@$HOST" 'echo OK: $(hostname)'
+
+          echo "== Загрузка файлов бота =="
+          tar -C alert-bot -czf /tmp/bot.tgz .
+          sshpass -e scp $SSH_OPTS /tmp/bot.tgz "$SSH_USER@$HOST:bot.tgz"
+          sshpass -e ssh $SSH_OPTS "$SSH_USER@$HOST" 'mkdir -p ~/alert-bot && tar -xzf ~/bot.tgz -C ~/alert-bot && rm ~/bot.tgz'
+
+          echo "== Передача .env =="
+          printf 'BOT_TOKEN=%s\nALERTS_IN_UA_TOKEN=%s\nDB_PATH=%s\n' \
+            "$BOT_TOKEN" "$ALERTS_TOKEN" "/home/$SSH_USER/alert-bot/alertbot.sqlite3" > /tmp/env.bot
+          sshpass -e scp $SSH_OPTS /tmp/env.bot "$SSH_USER@$HOST:alert-bot/.env"
+          rm /tmp/env.bot
+
+          echo "== Настройка и запуск на сервере =="
+          sshpass -e ssh $SSH_OPTS "$SSH_USER@$HOST" 'bash ~/alert-bot/remote-setup.sh'

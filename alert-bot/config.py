@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 """Конфигурация бота из переменных окружения (.env поддерживается)."""
 
 import os
