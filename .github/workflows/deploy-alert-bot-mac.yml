@@ -1,0 +1,70 @@
+name: Deploy alert bot to Mac mini
+
+on:
+  workflow_dispatch:
+    inputs:
+      bot_token:
+        description: "BOT_TOKEN Telegram-бота"
+        required: true
+      alerts_token:
+        description: "ALERTS_IN_UA_TOKEN (необязательно)"
+        required: false
+        default: ""
+      ts_authkey:
+        description: "Tailscale auth key (ephemeral, начинается с tskey-auth-)"
+        required: true
+      mac_host:
+        description: "Tailscale IP или имя Mac mini"
+        required: false
+        default: "100.98.19.58"
+      mac_user:
+        description: "Имя пользователя macOS (SSH)"
+        required: true
+      mac_password:
+        description: "Пароль пользователя macOS (для sshpass)"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ inputs.ts_authkey }}
+          use-cache: "true"
+
+      - name: Deploy and start bot on Mac mini
+        env:
+          MAC_HOST: ${{ inputs.mac_host }}
+          MAC_USER: ${{ inputs.mac_user }}
+          SSHPASS: ${{ inputs.mac_password }}
+          BOT_TOKEN: ${{ inputs.bot_token }}
+          ALERTS_TOKEN: ${{ inputs.alerts_token }}
+        run: |
+          set -e
+          echo "::add-mask::$BOT_TOKEN"
+          echo "::add-mask::$SSHPASS"
+          [ -n "$ALERTS_TOKEN" ] && echo "::add-mask::$ALERTS_TOKEN"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30"
+
+          echo "== Проверка соединения по Tailscale =="
+          sshpass -e ssh $SSH_OPTS "$MAC_USER@$MAC_HOST" 'echo OK: $(hostname); sw_vers -productVersion'
+
+          echo "== Загрузка файлов бота =="
+          tar -C alert-bot -czf /tmp/bot.tgz .
+          sshpass -e scp $SSH_OPTS /tmp/bot.tgz "$MAC_USER@$MAC_HOST:bot.tgz"
+          sshpass -e ssh $SSH_OPTS "$MAC_USER@$MAC_HOST" 'mkdir -p ~/alert-bot && tar -xzf ~/bot.tgz -C ~/alert-bot && rm ~/bot.tgz'
+
+          echo "== Передача .env =="
+          printf 'BOT_TOKEN=%s\nALERTS_IN_UA_TOKEN=%s\n' "$BOT_TOKEN" "$ALERTS_TOKEN" > /tmp/env.bot
+          sshpass -e scp $SSH_OPTS /tmp/env.bot "$MAC_USER@$MAC_HOST:alert-bot/.env"
+          rm /tmp/env.bot
+
+          echo "== Настройка и запуск через launchd =="
+          sshpass -e ssh $SSH_OPTS "$MAC_USER@$MAC_HOST" 'bash ~/alert-bot/macos-setup.sh'
