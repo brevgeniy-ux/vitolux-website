@@ -22,6 +22,15 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* Калькулятор доступен без авторизации */}
+        <Route
+          path="/calculator"
+          element={
+            <div className="min-h-screen bg-gray-100 py-8 px-4">
+              <CalculatorPage />
+            </div>
+          }
+        />
         <Route
           path="/"
           element={
@@ -37,7 +46,6 @@ function App() {
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
-          <Route path="calculator" element={<CalculatorPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
