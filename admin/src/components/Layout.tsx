@@ -40,6 +40,12 @@ export default function Layout() {
                 Замовлення
               </Link>
               <Link
+                to="/calculator"
+                className={`px-3 py-2 rounded ${isActive('/calculator') ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                Калькулятор
+              </Link>
+              <Link
                 to="/settings"
                 className={`px-3 py-2 rounded ${isActive('/settings') ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
               >

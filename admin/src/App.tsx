@@ -8,6 +8,7 @@ import CategoriesPage from './pages/CategoriesPage'
 import OrdersPage from './pages/OrdersPage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import SettingsPage from './pages/SettingsPage'
+import CalculatorPage from './pages/CalculatorPage'
 import Layout from './components/Layout'
 import { useAuthStore } from './store/authStore'
 
@@ -36,6 +37,7 @@ function App() {
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
+          <Route path="calculator" element={<CalculatorPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
