@@ -1,0 +1,33 @@
+{
+  "name": "vitolux-design-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Сервис дизайн-проектов квартир и домов с 3D-визуализацией",
+  "scripts": {
+    "dev": "concurrently -k -n web,api \"vite\" \"node --env-file-if-exists=.env server/index.mjs\"",
+    "dev:web": "vite",
+    "server": "node --env-file-if-exists=.env server/index.mjs",
+    "build": "tsc --noEmit && vite build",
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.169.0",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.169.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

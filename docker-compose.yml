@@ -53,5 +53,14 @@ services:
     depends_on:
       - backend
 
+  design-studio:
+    build:
+      context: ./design-studio
+    container_name: vitoluxua-design-studio
+    ports:
+      - "8787:8787"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
 volumes:
   mysql_data:

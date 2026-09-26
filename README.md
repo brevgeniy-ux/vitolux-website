@@ -23,6 +23,7 @@ vitoluxua/
 │   ├── src/
 │   └── public/
 ├── admin/            # React админка
+├── design-studio/    # Сервис дизайн-проектов интерьера с 3D (см. design-studio/README.md)
 │   ├── src/
 │   └── public/
 └── docs/             # Документация
