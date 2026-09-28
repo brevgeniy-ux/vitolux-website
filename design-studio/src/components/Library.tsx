@@ -6,6 +6,7 @@ import { ROOM_TYPES } from '../data/rooms';
 import { money, num } from '../lib/estimate';
 import { roomArea } from '../lib/geometry';
 import { FurnitureSymbol, LightSymbol } from './PlanSymbols';
+import { UnderlayPanel } from './UnderlayPanel';
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: 'select', label: 'Выбор', hint: 'Выбор и перемещение (V)' },
@@ -72,8 +73,11 @@ export function Library() {
             {tool === 'room' && 'Протяните мышью прямоугольник на плане. Края притягиваются к соседним помещениям.'}
             {tool === 'door' && 'Кликните внутри помещения рядом с нужной стеной.'}
             {tool === 'window' && 'Кликните внутри помещения рядом с наружной стеной.'}
+            {tool === 'calibrate' && 'Калибровка масштаба подложки — см. блок ниже.'}
+            {tool === 'underlay' && 'Перетаскивайте подложку мышью.'}
             {tool === 'select' && 'Перетаскивайте помещения, мебель и проёмы. Колесо — масштаб, Shift/ПКМ + тянуть — сдвиг плана.'}
           </p>
+          <UnderlayPanel />
           <h4>Помещения</h4>
           <ul className="room-list">
             {project.rooms

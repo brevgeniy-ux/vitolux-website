@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Project, Selection } from './types';
 import { db } from './lib/db';
 
-export type Tool = 'select' | 'room' | 'door' | 'window';
+export type Tool = 'select' | 'room' | 'door' | 'window' | 'calibrate' | 'underlay';
 export type View = 'plan' | '3d' | 'split' | 'docs';
 
 interface State {
@@ -17,6 +17,9 @@ interface State {
   placing: { kind: 'furniture' | 'light'; catalogId: string } | null;
   past: Project[];
   future: Project[];
+  /** Точки калибровки масштаба подложки */
+  calib: { x: number; y: number }[];
+  setCalib: (c: { x: number; y: number }[]) => void;
 
   load: () => Promise<void>;
   open: (id: string | null) => void;
@@ -55,6 +58,8 @@ export const useStore = create<State>((set, get) => ({
   placing: null,
   past: [],
   future: [],
+  calib: [],
+  setCalib: (calib) => set({ calib }),
 
   load: async () => {
     try {
@@ -118,7 +123,7 @@ export const useStore = create<State>((set, get) => ({
   },
   select: (selection) => set({ selection }),
   setLevel: (level) => set({ level, selection: null }),
-  setTool: (tool) => set({ tool, placing: null }),
+  setTool: (tool) => set({ tool, placing: null, calib: [] }),
   setView: (view) => set({ view }),
   setPlacing: (placing) => set({ placing, tool: 'select' }),
 }));

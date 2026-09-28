@@ -145,9 +145,15 @@ export function Plan({
   fixedViewBox?: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const bounds = levelBounds(project, level);
+  const underlays = interactive ? (project.underlays ?? []).filter((u) => u.level === level && u.visible) : [];
+  const roomBounds = levelBounds(project, level);
+  const hasRooms = project.rooms.some((r) => r.level === level);
+  // при пустом этаже с подложкой показываем подложку целиком
+  const ul = (project.underlays ?? []).find((u) => u.level === level);
+  const bounds =
+    interactive && ul && !hasRooms ? { x: ul.x, y: ul.y, w: ul.pxW * ul.mPerPx, h: ul.pxH * ul.mPerPx } : roomBounds;
   const pad = 1.4;
-  const initial = useMemo(() => ({ x: bounds.x - pad, y: bounds.y - pad, w: bounds.w + pad * 2, h: bounds.h + pad * 2 }), [project.id, level]); // eslint-disable-line react-hooks/exhaustive-deps
+  const initial = useMemo(() => ({ x: bounds.x - pad, y: bounds.y - pad, w: bounds.w + pad * 2, h: bounds.h + pad * 2 }), [project.id, level, ul?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [vb, setVb] = useState(initial);
   useEffect(() => setVb(initial), [initial]);
   const view = fixedViewBox ? { x: bounds.x - pad, y: bounds.y - pad, w: bounds.w + pad * 2, h: bounds.h + pad * 2 } : vb;
@@ -248,6 +254,10 @@ export function Plan({
       </defs>
       {interactive && <rect data-bg="1" x={view.x - 100} y={view.y - 100} width={view.w + 200} height={view.h + 200} fill="url(#grid5)" />}
 
+      {underlays.map((u) => (
+        <image key={u.id} href={u.dataUrl} x={u.x} y={u.y} width={u.pxW * u.mPerPx} height={u.pxH * u.mPerPx} opacity={u.opacity} preserveAspectRatio="none" pointerEvents="none" />
+      ))}
+
       {/* Помещения */}
       {rooms.map((r) => {
         const floor = floorById(floorIdFor(project.style, r.type, r.floorId));
@@ -261,7 +271,7 @@ export function Plan({
               width={r.w}
               height={r.d}
               fill={fill}
-              opacity={mode === 'floors' ? 0.85 : 1}
+              opacity={mode === 'floors' ? 0.85 : underlays.length ? 0.55 : 1}
               stroke={isSel ? '#e08a00' : 'none'}
               strokeWidth={0.04}
               onPointerDown={(e) => handlers?.onRoomDown?.(r, toWorld(e), e)}

@@ -11,7 +11,8 @@ type Drag =
   | { kind: 'resize'; id: string; handle: Handle; start: Pt; orig: Room }
   | { kind: 'furniture' | 'light'; id: string; start: Pt; orig: Pt }
   | { kind: 'opening'; id: string; start: Pt; orig: number }
-  | { kind: 'draw'; start: Pt; cur: Pt };
+  | { kind: 'draw'; start: Pt; cur: Pt }
+  | { kind: 'underlay'; id: string; start: Pt; orig: Pt };
 
 /** Притягивание к краям соседних помещений */
 function magnet(project: Project, room: Room, x: number, y: number, w: number, d: number) {
@@ -53,7 +54,24 @@ export function PlanEditor() {
   const selection = useStore((s) => s.selection);
   const tool = useStore((s) => s.tool);
   const placing = useStore((s) => s.placing);
-  const { mutate, checkpoint, select, setTool, setPlacing } = useStore.getState();
+  const calib = useStore((s) => s.calib);
+  const { mutate, checkpoint, select, setTool, setPlacing, setCalib } = useStore.getState();
+  const underlay = (project.underlays ?? []).find((u) => u.level === level);
+
+  /** Инструменты подложки: калибровка по двум точкам и перемещение */
+  const underlayDown = (p: Pt, e: React.PointerEvent) => {
+    if (tool === 'calibrate') {
+      setCalib(calib.length >= 2 ? [p] : [...calib, p]);
+      return true;
+    }
+    if (tool === 'underlay' && underlay) {
+      capture(e);
+      checkpoint();
+      drag.current = { kind: 'underlay', id: underlay.id, start: p, orig: { x: underlay.x, y: underlay.y } };
+      return true;
+    }
+    return false;
+  };
   const drag = useRef<Drag | null>(null);
   const [draft, setDraft] = useState<{ a: Pt; b: Pt } | null>(null);
 
@@ -106,7 +124,16 @@ export function PlanEditor() {
       interactive
       className={`plan-svg tool-${placing ? 'place' : tool}`}
       extra={
-        draft && (
+        <>
+          {calib.length > 0 && (
+            <g pointerEvents="none">
+              {calib.length === 2 && <line x1={calib[0].x} y1={calib[0].y} x2={calib[1].x} y2={calib[1].y} stroke="#d4380d" strokeWidth={0.04} />}
+              {calib.map((c, i) => (
+                <circle key={i} cx={c.x} cy={c.y} r={0.09} fill="#d4380d" />
+              ))}
+            </g>
+          )}
+          {draft && (
           <rect
             x={Math.min(draft.a.x, draft.b.x)}
             y={Math.min(draft.a.y, draft.b.y)}
@@ -117,11 +144,13 @@ export function PlanEditor() {
             strokeWidth={0.03}
             strokeDasharray="0.1 0.06"
           />
-        )
+          )}
+        </>
       }
       handlers={{
         onBackgroundDown: (p, e) => {
           if (placeAt(p)) return e.preventDefault();
+          if (underlayDown(p, e)) return e.preventDefault();
           if (tool === 'room') {
             e.preventDefault();
             capture(e);
@@ -136,6 +165,7 @@ export function PlanEditor() {
           if (e.button !== 0 || e.shiftKey) return;
           e.stopPropagation();
           if (placeAt(p)) return;
+          if (underlayDown(p, e)) return;
           if (tool === 'door' || tool === 'window') return addOpening(room, p);
           capture(e);
           if (tool === 'room') {
@@ -194,6 +224,16 @@ export function PlanEditor() {
           const dx = p.x - (d.kind === 'draw' ? 0 : d.start.x);
           const dy = p.y - (d.kind === 'draw' ? 0 : d.start.y);
           switch (d.kind) {
+            case 'underlay': {
+              mutate(
+                (pr) => {
+                  const u = pr.underlays?.find((x) => x.id === d.id);
+                  if (u) [u.x, u.y] = [round2(d.orig.x + dx), round2(d.orig.y + dy)];
+                },
+                { history: false },
+              );
+              break;
+            }
             case 'draw': {
               d.cur = { x: snap(p.x, 0.1), y: snap(p.y, 0.1) };
               setDraft({ a: d.start, b: d.cur });

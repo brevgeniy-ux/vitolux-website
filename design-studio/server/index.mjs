@@ -72,6 +72,34 @@ async function concept(body) {
   return data;
 }
 
+async function recognize(body) {
+  const { image, mediaType, prompt, schema } = body ?? {};
+  if (typeof image !== 'string' || image.length < 100) throw Object.assign(new Error('Нет изображения'), { status: 400 });
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(mediaType)) throw Object.assign(new Error('Неподдерживаемый формат изображения'), { status: 400 });
+  if (typeof prompt !== 'string' || prompt.length > 8000 || typeof schema !== 'object') throw Object.assign(new Error('Некорректный запрос'), { status: 400 });
+  const response = await client.beta.messages.create({
+    model: MODEL,
+    max_tokens: 16000,
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'high', format: { type: 'json_schema', schema } },
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+    system: 'Ты — архитектор-обмерщик. Точно переносишь планировки с изображений в числовую модель помещений.',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+          { type: 'text', text: prompt },
+        ],
+      },
+    ],
+  });
+  if (response.stop_reason === 'refusal') throw Object.assign(new Error('Модель отклонила запрос'), { status: 422 });
+  if (response.stop_reason === 'max_tokens') throw Object.assign(new Error('Ответ модели оборвался, попробуйте ещё раз'), { status: 502 });
+  return JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+}
+
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
 
 async function serveStatic(req, res) {
@@ -102,7 +130,7 @@ function readJson(req) {
     let s = '';
     req.on('data', (c) => {
       s += c;
-      if (s.length > 1e6) req.destroy();
+      if (s.length > 15e6) req.destroy();
     });
     req.on('end', () => {
       try {
@@ -122,6 +150,10 @@ http
       if (req.url === '/api/concept' && req.method === 'POST') {
         if (!client) return send(res, 503, { error: 'AI не настроен: задайте ANTHROPIC_API_KEY' });
         return send(res, 200, await concept(await readJson(req)));
+      }
+      if (req.url === '/api/recognize' && req.method === 'POST') {
+        if (!client) return send(res, 503, { error: 'AI не настроен: задайте ANTHROPIC_API_KEY' });
+        return send(res, 200, await recognize(await readJson(req)));
       }
       if (req.url.startsWith('/api/')) return send(res, 404, { error: 'not found' });
       return serveStatic(req, res);

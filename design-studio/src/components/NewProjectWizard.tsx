@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Project, ProjectKind, RoomType, StyleId } from '../types';
 import { useStore } from '../store';
 import { STYLE_LIST } from '../data/styles';
@@ -8,8 +8,9 @@ import { furnishProject } from '../lib/autoFurnish';
 import { lightProject } from '../lib/lighting';
 import { aiConcept, aiStatus } from '../lib/api';
 import { inArtifact } from '../lib/platform';
+import { prepareImage, projectFromUploads, recognizePlan, type PreparedImage, type RecognizedPlan } from '../lib/recognize';
 
-type Mode = 'template' | 'program' | 'ai' | 'blank';
+type Mode = 'upload' | 'template' | 'program' | 'ai' | 'blank';
 
 export function finalize(p: Project, furnish: boolean, light: boolean) {
   if (furnish) p.furniture = furnishProject(p);
@@ -19,7 +20,7 @@ export function finalize(p: Project, furnish: boolean, light: boolean) {
 
 export function NewProjectWizard({ onClose }: { onClose: () => void }) {
   const create = useStore((s) => s.create);
-  const [mode, setMode] = useState<Mode>('template');
+  const [mode, setMode] = useState<Mode>('upload');
   const [name, setName] = useState('');
   const [client, setClient] = useState('');
   const [kind, setKind] = useState<ProjectKind>('apartment');
@@ -33,6 +34,23 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [aiOk, setAiOk] = useState<boolean | null>(null);
+  const [images, setImages] = useState<PreparedImage[]>([]);
+  const [autoRecognize, setAutoRecognize] = useState(true);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const addFiles = async (files: FileList | File[]) => {
+    setErr(null);
+    for (const f of Array.from(files)) {
+      try {
+        const img = await prepareImage(f);
+        setImages((l) => [...l, img]);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    }
+  };
 
   useEffect(() => {
     aiStatus().then(setAiOk);
@@ -42,7 +60,37 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
     setErr(null);
     let p: Project;
     try {
-      if (mode === 'template') {
+      if (mode === 'upload') {
+        if (!images.length) throw new Error('Загрузите хотя бы одно изображение планировки');
+        setBusy(true);
+        const floors: { img: PreparedImage; plan?: RecognizedPlan }[] = [];
+        const failed: string[] = [];
+        for (let i = 0; i < images.length; i++) {
+          let plan: RecognizedPlan | undefined;
+          if (autoRecognize && aiOk) {
+            setProgress(images.length > 1 ? `Распознаю ${i + 1} этаж из ${images.length}… обычно 30–90 секунд` : 'Распознаю планировку… обычно 30–90 секунд');
+            try {
+              plan = await recognizePlan(images[i], kind, brief);
+              if (!plan.rooms?.length) throw new Error('помещения не найдены');
+            } catch (e) {
+              plan = undefined;
+              failed.push(`${images.length > 1 ? `${i + 1} эт.: ` : ''}${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          floors.push({ img: images[i], plan });
+        }
+        const res = projectFromUploads(kind, style, name, floors);
+        p = res.project;
+        if (failed.length) p.notes = (p.notes ? p.notes + ' ' : '') + 'Не распознано автоматически: ' + failed.join('; ');
+        p.client = client;
+        const recognized = floors.some((f) => f.plan);
+        create(finalize(p, furnish && recognized, light && recognized));
+        const st = useStore.getState();
+        st.setView('plan');
+        if (!recognized) st.setTool('calibrate');
+        onClose();
+        return;
+      } else if (mode === 'template') {
         p = projectFromTemplate(tpl, style);
       } else if (mode === 'program') {
         if (!program.length) throw new Error('Добавьте хотя бы одно помещение');
@@ -96,8 +144,9 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
           <div className="seg">
             {(
               [
-                ['template', 'Типовая планировка'],
-                ['program', 'По списку помещений'],
+                ['upload', 'Своя планировка'],
+                ['template', 'Типовая'],
+                ['program', 'По списку'],
                 ['ai', 'AI-бриф'],
                 ['blank', 'С нуля'],
               ] as [Mode, string][]
@@ -107,6 +156,59 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
               </button>
             ))}
           </div>
+
+          {mode === 'upload' && (
+            <div>
+              <div
+                className={'upload-drop' + (over ? ' over' : '')}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setOver(true);
+                }}
+                onDragLeave={() => setOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setOver(false);
+                  addFiles(e.dataTransfer.files);
+                }}
+              >
+                <b>Перетащите сюда изображение планировки</b> или нажмите, чтобы выбрать файл
+                <br />
+                <span className="small">Чертёж БТИ, план от застройщика, скан, фото или рисунок от руки · JPG, PNG, WebP · для дома — по файлу на этаж</span>
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+              {images.length > 0 && (
+                <div className="upload-list">
+                  {images.map((im, i) => (
+                    <figure key={i}>
+                      <img src={im.dataUrl} alt={im.name} />
+                      <figcaption>
+                        <span>{images.length > 1 ? `${i + 1} этаж` : im.name}</span>
+                        <button className="link danger" onClick={() => setImages((l) => l.filter((_, j) => j !== i))}>
+                          ×
+                        </button>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+              <label className="field" style={{ marginTop: 12 }}>
+                <span>Подсказка для распознавания (необязательно)</span>
+                <input value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="Например: общая площадь 64 м², ширина гостиной 4,2 м" />
+              </label>
+              {aiOk ? (
+                <label className="check">
+                  <input type="checkbox" checked={autoRecognize} onChange={(e) => setAutoRecognize(e.target.checked)} /> Распознать помещения, двери и окна автоматически (Claude)
+                </label>
+              ) : (
+                <p className="muted small">
+                  Автораспознавание недоступно{inArtifact() ? '' : ' (нужен ANTHROPIC_API_KEY на сервере)'}. Изображение станет подложкой: задайте масштаб по известному размеру и обведите помещения.
+                </p>
+              )}
+              <p className="muted small">После создания изображение остаётся подложкой под планом — по нему удобно проверить и поправить размеры.</p>
+            </div>
+          )}
 
           {mode === 'template' && (
             <div className="tpl-grid">
@@ -119,7 +221,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {(mode === 'program' || mode === 'ai' || mode === 'blank') && (
+          {(mode === 'upload' || mode === 'program' || mode === 'ai' || mode === 'blank') && (
             <div className="seg small">
               <button className={kind === 'apartment' ? 'active' : ''} onClick={() => setKind('apartment')}>
                 Квартира
@@ -222,6 +324,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
               </label>
             </div>
           )}
+          {progress && busy && <div className="hint">{progress}</div>}
           {err && <div className="hint warn">{err}</div>}
         </div>
         <footer>
@@ -229,7 +332,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
             Отмена
           </button>
           <button className="btn primary" disabled={busy} onClick={submit}>
-            {busy ? 'AI готовит концепцию…' : 'Создать проект'}
+            {busy ? (mode === 'upload' ? 'Распознаю…' : 'AI готовит концепцию…') : 'Создать проект'}
           </button>
         </footer>
       </div>

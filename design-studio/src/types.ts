@@ -79,6 +79,23 @@ export interface Render {
   createdAt: number;
 }
 
+/** Загруженное изображение планировки, подложенное под план этажа */
+export interface Underlay {
+  id: string;
+  level: number;
+  dataUrl: string;
+  /** Размер изображения в пикселях */
+  pxW: number;
+  pxH: number;
+  /** Положение левого верхнего угла изображения на плане, м */
+  x: number;
+  y: number;
+  /** Метров в одном пикселе */
+  mPerPx: number;
+  opacity: number;
+  visible: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -95,6 +112,7 @@ export interface Project {
   furniture: FurnitureItem[];
   lights: LightItem[];
   renders: Render[];
+  underlays?: Underlay[];
   createdAt: number;
   updatedAt: number;
 }

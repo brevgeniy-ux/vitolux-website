@@ -41,6 +41,9 @@ export function ProjectsPage() {
             <button className="btn primary lg" onClick={() => setWizard(true)}>
               + Новый проект
             </button>
+            <button className="btn lg" onClick={() => setWizard(true)}>
+              Загрузить свою планировку
+            </button>
             <button
               className="btn lg"
               onClick={() => {
@@ -59,7 +62,7 @@ export function ProjectsPage() {
         </div>
         <ol className="steps">
           <li>
-            <b>Планировка</b>шаблон, список помещений, AI-бриф или ручное черчение
+            <b>Планировка</b>загрузка плана заказчика с распознаванием, шаблон, список помещений, AI-бриф или черчение
           </li>
           <li>
             <b>Наполнение</b>мебель и сантехника по эргономике, 6 стилей
