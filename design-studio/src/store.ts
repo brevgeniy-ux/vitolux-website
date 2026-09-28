@@ -70,10 +70,10 @@ export const useStore = create<State>((set, get) => ({
   },
   create: (p) => {
     set((s) => ({ projects: [p, ...s.projects], project: structuredClone(p), selection: null, level: 0, past: [], future: [], view: 'split' }));
-    db.put(p);
+    db.put(p).catch((e) => console.error('Не удалось сохранить проект', e));
   },
   remove: async (id) => {
-    await db.remove(id);
+    await db.remove(id).catch((e) => console.error('Не удалось удалить проект', e));
     set((s) => ({ projects: s.projects.filter((p) => p.id !== id), project: s.project?.id === id ? null : s.project }));
   },
   duplicate: (id) => {
@@ -81,7 +81,7 @@ export const useStore = create<State>((set, get) => ({
     if (!src) return;
     const copy: Project = { ...structuredClone(src), id: Math.random().toString(36).slice(2, 10), name: src.name + ' (копия)', createdAt: Date.now(), updatedAt: Date.now() };
     set((s) => ({ projects: [copy, ...s.projects] }));
-    db.put(copy);
+    db.put(copy).catch((e) => console.error('Не удалось сохранить проект', e));
   },
   mutate: (fn, opts) => {
     const cur = get().project;

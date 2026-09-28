@@ -2,14 +2,8 @@ import { useRef, useState } from 'react';
 import { useStore } from '../store';
 import { Scene3D, overviewCamera, roomCamera, type CameraRequest, type SceneApi, type ViewOptions } from '../three/Scene3D';
 import { uid } from '../lib/geometry';
+import { inArtifact, saveFile, zipSingle } from '../lib/platform';
 
-export function download(name: string, blob: Blob) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-}
 
 export function View3D() {
   const project = useStore((s) => s.project)!;
@@ -50,7 +44,15 @@ export function View3D() {
     const api = apiRef.current;
     if (!api) return;
     const blob = await api.exportGLB();
-    download(`${project.name || 'project'}.glb`, blob);
+    const name = `${project.name || 'project'}.glb`;
+    try {
+      // в просмотрщике claude.ai формат .glb напрямую не сохраняется — отдаём его в zip-архиве
+      if (inArtifact()) await saveFile(`${project.name || 'project'}-3d.zip`, await zipSingle(name, blob));
+      else await saveFile(name, blob);
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : 'Не удалось сохранить файл');
+      setTimeout(() => setFlash(null), 2500);
+    }
   };
 
   return (

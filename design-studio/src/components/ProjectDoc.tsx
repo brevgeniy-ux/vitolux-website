@@ -9,7 +9,8 @@ import { buildEstimate, money, num, toCSV, type EstimateLine } from '../lib/esti
 import { luxReport, lightsInRoom, UF, MF } from '../lib/lighting';
 import { Plan, type PlanMode } from './Plan';
 import { LightSymbol } from './PlanSymbols';
-import { download } from './View3D';
+import { useState } from 'react';
+import { inArtifact, saveFile } from '../lib/platform';
 
 let sheetNo = 0;
 
@@ -56,6 +57,12 @@ const PLAN_SHEETS: { mode: PlanMode; title: string; note: string }[] = [
 export function ProjectDoc() {
   const project = useStore((s) => s.project)!;
   const mutate = useStore((s) => s.mutate);
+  const [msg, setMsg] = useState<string | null>(null);
+  const save = (name: string, blob: Blob) =>
+    saveFile(name, blob).catch((e) => {
+      setMsg(e instanceof Error ? e.message : 'Не удалось сохранить файл');
+      setTimeout(() => setMsg(null), 3000);
+    });
   const style = STYLES[project.style];
   const est = buildEstimate(project);
   const levels = [...new Set(project.rooms.map((r) => r.level))].sort();
@@ -91,15 +98,21 @@ export function ProjectDoc() {
       <div className="docs-toolbar no-print">
         <b>Альбом дизайн-проекта</b> · {total} листов
         <span className="sep" />
-        <button className="btn sm primary" onClick={() => window.print()}>
-          Печать / сохранить PDF
+        {!inArtifact() && (
+          <button className="btn sm primary" onClick={() => window.print()}>
+            Печать / сохранить PDF
+          </button>
+        )}
+        <button className={'btn sm' + (inArtifact() ? ' primary' : '')} onClick={() => save(`${project.name}-альбом.html`, new Blob([albumHtml(project.name)], { type: 'text/html' }))} title="Откройте файл в браузере и сохраните в PDF через печать">
+          Альбом HTML → PDF
         </button>
-        <button className="btn sm" onClick={() => download(`${project.name}-смета.csv`, new Blob([toCSV(project)], { type: 'text/csv;charset=utf-8' }))}>
+        <button className="btn sm" onClick={() => save(`${project.name}-смета.csv`, new Blob([toCSV(project)], { type: 'text/csv;charset=utf-8' }))}>
           Смета CSV (Excel)
         </button>
-        <button className="btn sm" onClick={() => download(`${project.name}.json`, new Blob([JSON.stringify(project)], { type: 'application/json' }))}>
+        <button className="btn sm" onClick={() => save(`${project.name}.json`, new Blob([JSON.stringify(project)], { type: 'application/json' }))}>
           Файл проекта JSON
         </button>
+        {msg && <span className="muted small">{msg}</span>}
       </div>
 
       <Sheet project={project} title="Титульный лист" total={total}>
@@ -457,4 +470,28 @@ export function ProjectDoc() {
       )}
     </div>
   );
+}
+
+/** Самостоятельный HTML-файл альбома: открыть в браузере и напечатать в PDF (А4, альбомная) */
+function albumHtml(title: string) {
+  const css = [...document.styleSheets]
+    .map((sh) => {
+      try {
+        return [...sh.cssRules].map((r) => r.cssText).join('\n');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+  const root = document.querySelector('.docs')!.cloneNode(true) as HTMLElement;
+  root.querySelectorAll('.no-print').forEach((n) => n.remove());
+  root.querySelectorAll('input').forEach((inp) => {
+    const span = document.createElement('span');
+    span.className = inp.className;
+    span.textContent = (inp as HTMLInputElement).value;
+    inp.replaceWith(span);
+  });
+  const esc = title.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc}</title><style>${css}
+body{background:#d9d6d0} @media print{body{background:#fff}}</style></head><body><div class="docs">${root.innerHTML}</div></body></html>`;
 }

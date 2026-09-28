@@ -12,6 +12,8 @@ export function ProjectsPage() {
   const projects = useStore((s) => s.projects);
   const { open, remove, duplicate, create } = useStore.getState();
   const [wizard, setWizard] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const importFile = async (f: File) => {
@@ -20,7 +22,7 @@ export function ProjectsPage() {
       if (!Array.isArray(p.rooms)) throw new Error('bad');
       create({ ...p, id: uid(), updatedAt: Date.now() });
     } catch {
-      alert('Не удалось прочитать файл проекта');
+      setError('Не удалось прочитать файл проекта: нужен .json, сохранённый в Design Studio');
     }
   };
 
@@ -74,6 +76,7 @@ export function ProjectsPage() {
         </ol>
       </header>
 
+      {error && <div className="hint warn">{error}</div>}
       <section className="project-grid">
         {projects.length === 0 && <div className="empty">Проектов пока нет — создайте первый или откройте демо.</div>}
         {projects.map((p) => {
@@ -94,9 +97,20 @@ export function ProjectsPage() {
                 <button className="link" onClick={() => duplicate(p.id)}>
                   копия
                 </button>
-                <button className="link danger" onClick={() => confirm(`Удалить «${p.name}»?`) && remove(p.id)}>
-                  удалить
-                </button>
+                {confirmId === p.id ? (
+                  <>
+                    <button className="link danger" onClick={() => remove(p.id)}>
+                      да, удалить
+                    </button>
+                    <button className="link" onClick={() => setConfirmId(null)}>
+                      отмена
+                    </button>
+                  </>
+                ) : (
+                  <button className="link danger" onClick={() => setConfirmId(p.id)}>
+                    удалить
+                  </button>
+                )}
               </div>
             </article>
           );

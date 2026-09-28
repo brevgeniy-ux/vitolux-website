@@ -10,7 +10,8 @@
     "server": "node --env-file-if-exists=.env server/index.mjs",
     "build": "tsc --noEmit && vite build",
     "start": "node --env-file-if-exists=.env server/index.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:artifact": "npm run build && node scripts/build-artifact.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

@@ -7,6 +7,7 @@ import { DEFAULT_PROGRAM, TEMPLATES, emptyProject, projectFromProgram, projectFr
 import { furnishProject } from '../lib/autoFurnish';
 import { lightProject } from '../lib/lighting';
 import { aiConcept, aiStatus } from '../lib/api';
+import { inArtifact } from '../lib/platform';
 
 type Mode = 'template' | 'program' | 'ai' | 'blank';
 
@@ -167,7 +168,13 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
             <div>
               {aiOk === false && (
                 <div className="hint warn">
-                  AI-сервер недоступен. Запустите <code>npm run dev</code> (или <code>npm start</code>) с переменной окружения <code>ANTHROPIC_API_KEY</code>.
+                  {inArtifact() ? (
+                    'Claude недоступен на этой странице.'
+                  ) : (
+                    <>
+                      AI-сервер недоступен. Запустите <code>npm run dev</code> (или <code>npm start</code>) с переменной окружения <code>ANTHROPIC_API_KEY</code>.
+                    </>
+                  )}
                 </div>
               )}
               <label className="field">
@@ -183,7 +190,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
                 <span>Общая площадь (необязательно)</span>
                 <input type="number" value={area} onChange={(e) => setArea(e.target.value)} style={{ width: 100 }} />
               </label>
-              <p className="muted small">AI (Claude) подберёт стиль, состав и площади помещений и напишет текст концепции. Планировка, мебель и свет строятся автоматически.</p>
+              <p className="muted small">{inArtifact() ? 'Запрос выполняется от вашего аккаунта Claude. ' : ''}AI (Claude) подберёт стиль, состав и площади помещений и напишет текст концепции. Планировка, мебель и свет строятся автоматически.</p>
             </div>
           )}
 
