@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../store';
 import type { Project } from '../types';
-import { STYLES } from '../data/styles';
+import { styleOf } from '../data/styles';
 import { buildEstimate, money, num } from '../lib/estimate';
 import { uid } from '../lib/geometry';
 import { NewProjectWizard, finalize } from './NewProjectWizard';
@@ -90,7 +90,7 @@ export function ProjectsPage() {
               <div className="card-body">
                 <b>{p.name}</b>
                 <span className="muted small">
-                  {p.kind === 'house' ? 'Дом' : 'Квартира'} · {num(est.area, 1)} м² · {STYLES[p.style].name}
+                  {p.kind === 'house' ? 'Дом' : 'Квартира'} · {num(est.area, 1)} м² · {styleOf(p).name}
                 </span>
                 <span className="muted small">
                   {money(est.total)} · изм. {new Date(p.updatedAt).toLocaleDateString('ru-RU')}

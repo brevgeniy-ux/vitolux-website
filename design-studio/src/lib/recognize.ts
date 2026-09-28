@@ -3,7 +3,8 @@ import type { Opening, Project, ProjectKind, Room, RoomType, StyleId, Underlay, 
 import { ROOM_TYPES, ROOM_TYPE_LIST } from '../data/rooms';
 import { emptyProject } from './layout';
 import { clamp, round2, uid, wallLength } from './geometry';
-import { artifactSample, inArtifact, sampleErrorText } from './platform';
+import { inArtifact } from './platform';
+import { aiJson, aiMaxImages } from './ai';
 
 export interface PreparedImage {
   dataUrl: string;
@@ -59,12 +60,14 @@ export interface RecognizedPlan {
   rooms: { name: string; type: RoomType; x: number; y: number; w: number; d: number }[];
   openings: { room: number; kind: 'door' | 'window'; wall: WallSide; offset: number; width: number }[];
   notes?: string;
+  /** Высота потолка с чертежа, м (0 — не указана) */
+  ceilingHeight?: number;
 }
 
 export const RECOGNIZE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'planBox', 'width', 'depth', 'rooms', 'openings', 'notes'],
+  required: ['name', 'planBox', 'width', 'depth', 'rooms', 'openings', 'notes', 'ceilingHeight'],
   properties: {
     name: { type: 'string' },
     planBox: {
@@ -107,6 +110,7 @@ export const RECOGNIZE_SCHEMA = {
       },
     },
     notes: { type: 'string' },
+    ceilingHeight: { type: 'number' },
   },
 };
 
@@ -122,35 +126,24 @@ export function recognizePrompt(kind: ProjectKind, hint: string, w: number, h: n
 - openings — двери и окна: room — индекс помещения в массиве rooms, wall — стена этого помещения (n — верхняя, s — нижняя, w — левая, e — правая), offset — расстояние от левого (для n/s) или верхнего (для w/e) угла помещения до начала проёма, width — ширина проёма. Дверь между двумя помещениями указывай один раз.
 - planBox — где на изображении находится наружный контур: доли ширины и высоты изображения от 0 до 1 (x0,y0 — левый верхний угол контура, x1,y1 — правый нижний).
 - width и depth — габариты наружного контура в метрах.
-- notes — кратко по-русски: что распознано уверенно, что пришлось додумать.${hint ? `\n\nДополнительно от заказчика: ${hint}` : ''}`;
+- ceilingHeight — высота потолка в метрах, только если она явно указана на изображении (подпись «h=», «высота»), иначе 0.
+- notes — кратко по-русски: что распознано уверенно, что пришлось додумать, каких данных на чертеже нет.${hint ? `\n\nДополнительно от заказчика: ${hint}` : ''}`;
 }
 
-const JSON_SHAPE = `Ответь только JSON-объектом:
-{"name": "Квартира …", "planBox": {"x0": 0.05, "y0": 0.08, "x1": 0.95, "y1": 0.9}, "width": 10.6, "depth": 7.4,
+const JSON_SHAPE = `{"name": "Квартира …", "planBox": {"x0": 0.05, "y0": 0.08, "x1": 0.95, "y1": 0.9}, "width": 10.6, "depth": 7.4,
  "rooms": [{"name": "Гостиная", "type": "living", "x": 0, "y": 0, "w": 5.2, "d": 4}],
- "openings": [{"room": 0, "kind": "window", "wall": "n", "offset": 1.5, "width": 1.8}], "notes": "…"}`;
+ "openings": [{"room": 0, "kind": "window", "wall": "n", "offset": 1.5, "width": 1.8}], "notes": "…", "ceilingHeight": 0}`;
 
 export async function recognizePlan(img: PreparedImage, kind: ProjectKind, hint: string): Promise<RecognizedPlan> {
-  if (inArtifact()) {
-    const sample = await artifactSample();
-    if (!sample) throw new Error('Claude недоступен на этой странице — обведите планировку вручную');
-    const s = sample as unknown as { json: <T>(i: string, o?: object) => Promise<T>; limits?: () => Promise<{ images?: unknown }> };
-    const lim = await s.limits?.().catch(() => null);
-    if (lim && !lim.images) throw new Error('Отправка изображений Claude недоступна в этом окне — обведите планировку вручную');
-    try {
-      return await s.json<RecognizedPlan>(recognizePrompt(kind, hint, img.w, img.h) + '\n\n' + JSON_SHAPE, { images: img.blob, modelTier: 'complex', cache: false });
-    } catch (e) {
-      throw new Error(sampleErrorText(e));
-    }
-  }
-  const r = await fetch('/api/recognize', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: img.dataUrl.split(',')[1], mediaType: 'image/jpeg', prompt: recognizePrompt(kind, hint, img.w, img.h), schema: RECOGNIZE_SCHEMA }),
+  if (inArtifact() && (await aiMaxImages()) < 1) throw new Error('Отправка изображений Claude недоступна в этом окне — обведите планировку вручную');
+  return aiJson<RecognizedPlan>({
+    system: 'Ты — архитектор-обмерщик. Точно переносишь планировки с изображений в числовую модель помещений.',
+    turns: [{ role: 'user', content: recognizePrompt(kind, hint, img.w, img.h) }],
+    images: [img.blob],
+    schema: RECOGNIZE_SCHEMA,
+    example: JSON_SHAPE,
+    depth: 'deep',
   });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || `Ошибка сервера (${r.status})`);
-  return j as RecognizedPlan;
 }
 
 // ---------- Преобразование в помещения проекта ----------
@@ -227,6 +220,10 @@ export function projectFromUploads(kind: ProjectKind, style: StyleId, name: stri
       p.rooms.push(...rooms);
       p.openings.push(...openings);
       p.underlays!.push(alignedUnderlay(f.img, f.plan, level));
+      if (Number(f.plan.ceilingHeight) >= 2.2 && Number(f.plan.ceilingHeight) <= 6) {
+        p.ceilingHeight = Number(f.plan.ceilingHeight);
+        p.facts = { ...p.facts, ceilingHeight: true };
+      }
       if (f.plan.notes) notes.push((floors.length > 1 ? `${level + 1} эт.: ` : '') + f.plan.notes);
     } else {
       p.underlays!.push(makeUnderlay(f.img, level));

@@ -1,10 +1,10 @@
 import type { Project, Room, WallSide } from '../types';
 import { ROOM_TYPES } from '../data/rooms';
-import { floorById, RATES } from '../data/materials';
-import { floorIdFor, wallColorFor } from '../data/styles';
+import { floorById, RATES, wallFinishById } from '../data/materials';
+import { floorIdOf, wallColorOf } from '../data/styles';
 import { furnitureById } from '../data/furniture';
 import { lightById } from '../data/lights';
-import { roomArea, roomPerimeter, wallGaps } from './geometry';
+import { WALL_T, roomArea, roomPerimeter, wallGaps } from './geometry';
 
 export interface RoomFinish {
   room: Room;
@@ -17,6 +17,9 @@ export interface RoomFinish {
   floorId: string;
   wallColor: string;
   baseboard: number;
+  /** Площади стен под прочие виды отделки (кроме покраски и плитки санузлов) */
+  finishAreas: Record<string, number>;
+  wallFinishName: string;
   doors: number;
   windowsWidth: number;
 }
@@ -29,21 +32,38 @@ export function roomFinish(project: Project, room: Room): RoomFinish {
   let doorWidth = 0;
   let doors = 0;
   let windowsWidth = 0;
+  const sideArea: Partial<Record<WallSide, number>> = {};
   for (const side of ['n', 's', 'e', 'w'] as WallSide[]) {
+    const len = Math.max(0, (side === 'n' || side === 's' ? room.w : room.d) - 2 * WALL_T);
+    let sideOpen = 0;
     for (const g of wallGaps(project, room, side)) {
+      sideOpen += (g.end - g.start) * (g.top - g.sill);
       openingsArea += (g.end - g.start) * (g.top - g.sill);
       if (g.kind === 'door') {
         doorWidth += g.end - g.start;
         doors++;
       } else windowsWidth += g.end - g.start;
     }
+    sideArea[side] = Math.max(0, len * project.ceilingHeight - sideOpen);
   }
   const wallArea = Math.max(0, perimeter * H - openingsArea);
   const info = ROOM_TYPES[room.type];
   let tileArea = 0;
-  if (info.wet && room.type !== 'kitchen') tileArea = wallArea;
-  else if (room.type === 'kitchen') tileArea = Math.min(wallArea, 3.2 * 0.65);
-  const floorId = floorIdFor(project.style, room.type, room.floorId);
+  const finish = wallFinishById(room.wallFinish);
+  const finishAreas: Record<string, number> = {};
+  let rest = wallArea;
+  if (room.accentWall && room.accentWall.finish !== 'paint') {
+    const a = Math.min(rest, sideArea[room.accentWall.side] ?? 0);
+    finishAreas[room.accentWall.finish] = a;
+    rest -= a;
+  }
+  if (info.wet && room.type !== 'kitchen' && !room.wallFinish) tileArea = rest;
+  else if (room.type === 'kitchen') tileArea = Math.min(rest, 3.2 * 0.65);
+  if (finish.id !== 'paint') {
+    finishAreas[finish.id] = (finishAreas[finish.id] ?? 0) + rest - tileArea;
+  }
+  const paintArea = finish.id === 'paint' ? rest - tileArea : 0;
+  const floorId = floorIdOf(project, room);
   const floor = floorById(floorId);
   const tiled = floor.pattern === 'tiles' || floor.pattern === 'marble';
   return {
@@ -51,11 +71,13 @@ export function roomFinish(project: Project, room: Room): RoomFinish {
     area,
     perimeter,
     wallArea,
-    paintArea: wallArea - tileArea,
+    paintArea,
     tileArea,
+    finishAreas,
+    wallFinishName: finish.name + (room.accentWall ? ` + акцент: ${wallFinishById(room.accentWall.finish).name}` : ''),
     floorName: floor.name,
     floorId,
-    wallColor: wallColorFor(project.style, room.type, room.wallColor),
+    wallColor: wallColorOf(project, room),
     baseboard: tiled && info.wet ? 0 : Math.max(0, perimeter - doorWidth),
     doors,
     windowsWidth,
@@ -96,6 +118,9 @@ export function buildEstimate(project: Project) {
   const baseboard = finishes.reduce((s, f) => s + f.baseboard, 0);
   push('Отделочные материалы', 'Краска интерьерная моющаяся (2 слоя)', 'л', paintArea * RATES.paintConsumption, RATES.paintPerLiter);
   push('Отделочные материалы', 'Грунтовка, шпаклёвка, расходники', 'м²', paintArea, RATES.primerPerM2);
+  const wallFin = new Map<string, number>();
+  for (const f of finishes) for (const [id, a] of Object.entries(f.finishAreas)) wallFin.set(id, (wallFin.get(id) ?? 0) + a);
+  for (const [id, a] of wallFin) push('Отделка стен (материал и работа)', wallFinishById(id).name, 'м²', a * 1.05, wallFinishById(id).pricePerM2);
   push('Отделочные материалы', 'Настенная плитка (+10% запас)', 'м²', tileArea * 1.1, RATES.wallTilePerM2);
   push('Отделочные материалы', 'Плинтус скрытый/МДФ', 'м.п.', baseboard * 1.05, RATES.baseboardPerM);
   push('Отделочные материалы', 'Потолок (ГКЛ/натяжной) с отделкой', 'м²', ceiling, RATES.ceilingPerM2);

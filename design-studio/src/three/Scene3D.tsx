@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { Project, Room, WallSide } from '../types';
-import { STYLES, floorIdFor, wallColorFor } from '../data/styles';
-import { floorById } from '../data/materials';
+import { floorIdOf, styleOf, wallColorOf } from '../data/styles';
+import { floorById, wallFinishById, type WallFinish } from '../data/materials';
 import { furnitureById } from '../data/furniture';
 import { lightById } from '../data/lights';
 import { WALL_T, itemRect, levelBounds, wallGaps, type WallGap } from '../lib/geometry';
 import { lightsInRoom } from '../lib/lighting';
-import { floorTexture } from './textures';
+import { floorTexture, wallTexture } from './textures';
 import { FurnitureModel, type Palette } from './FurnitureModel';
 import { LightFixture } from './LightFixture';
 
@@ -40,7 +40,7 @@ export const levelY = (p: Project, level: number) => level * (p.ceilingHeight + 
 
 // ---------- Стены ----------
 
-function WallPieces({ room, side, H, gaps, color, cut }: { room: Room; side: WallSide; H: number; gaps: WallGap[]; color: string; cut: number }) {
+function WallPieces({ room, side, H, gaps, color, cut, finish }: { room: Room; side: WallSide; H: number; gaps: WallGap[]; color: string; cut: number; finish: WallFinish }) {
   const horizontal = side === 'n' || side === 's';
   const L = horizontal ? room.w : room.d;
   const pieces: { s: number; e: number; b: number; t: number }[] = [];
@@ -67,14 +67,20 @@ function WallPieces({ room, side, H, gaps, color, cut }: { room: Room; side: Wal
         else if (side === 's') [pos, size] = [[room.x + mid, (b + t) / 2, room.y + room.d - WALL_T / 2], [len, t - b, WALL_T]];
         else if (side === 'w') [pos, size] = [[room.x + WALL_T / 2, (b + t) / 2, room.y + mid], [WALL_T, t - b, len]];
         else [pos, size] = [[room.x + room.w - WALL_T / 2, (b + t) / 2, room.y + mid], [WALL_T, t - b, len]];
-        return (
-          <mesh key={i} position={pos} castShadow receiveShadow>
-            <boxGeometry args={size} />
-            <meshStandardMaterial color={color} roughness={0.92} />
-          </mesh>
-        );
+        return <WallBox key={i} pos={pos} size={size} len={len} h={t - b} color={color} finish={finish} />;
       })}
     </>
+  );
+}
+
+function WallBox({ pos, size, len, h, color, finish }: { pos: [number, number, number]; size: [number, number, number]; len: number; h: number; color: string; finish: WallFinish }) {
+  const tex = useMemo(() => wallTexture(finish, color, len, h), [finish, color, len, h]);
+  useEffect(() => () => tex?.dispose(), [tex]);
+  return (
+    <mesh position={pos} castShadow receiveShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial key={tex ? tex.uuid : 'plain'} color={tex ? '#ffffff' : color} map={tex ?? undefined} roughness={finish.roughness} />
+    </mesh>
   );
 }
 
@@ -152,12 +158,12 @@ function OpeningFills({ room, side, gaps, frame }: { room: Room; side: WallSide;
 }
 
 function RoomMesh({ project, room, opts, selected }: { project: Project; room: Room; opts: ViewOptions; selected: boolean }) {
-  const style = STYLES[project.style];
+  const style = styleOf(project);
   const H = project.ceilingHeight;
-  const floor = floorById(floorIdFor(project.style, room.type, room.floorId));
+  const floor = floorById(floorIdOf(project, room));
   const tex = useMemo(() => floorTexture(floor, room.w, room.d), [floor, room.w, room.d]);
   useEffect(() => () => tex.dispose(), [tex]);
-  const wallColor = wallColorFor(project.style, room.type, room.wallColor);
+  const wallColor = wallColorOf(project, room);
   const cut = opts.cutaway ? 1.1 : H;
   const frame = project.style === 'loft' || project.style === 'modern' ? '#2b2d30' : '#f4f2ee';
 
@@ -175,7 +181,15 @@ function RoomMesh({ project, room, opts, selected }: { project: Project; room: R
         const gaps = wallGaps(project, room, side);
         return (
           <group key={side}>
-            <WallPieces room={room} side={side} H={H} gaps={gaps} color={wallColor} cut={cut} />
+            <WallPieces
+              room={room}
+              side={side}
+              H={H}
+              gaps={gaps}
+              color={room.accentWall?.side === side ? room.accentWall.color ?? wallColor : wallColor}
+              finish={wallFinishById(room.accentWall?.side === side ? room.accentWall.finish : room.wallFinish)}
+              cut={cut}
+            />
             <OpeningFills room={room} side={side} gaps={gaps} frame={frame} />
           </group>
         );
@@ -194,7 +208,7 @@ function RoomLight({ project, room, night }: { project: Project; room: Room; nig
   const lights = lightsInRoom(project, room);
   const lumens = lights.reduce((s, l) => s + (lightById(l.catalogId)?.lumens ?? 0), 0);
   if (!lumens) return null;
-  const cct = STYLES[project.style].cct;
+  const cct = styleOf(project).cct;
   const color = cct <= 2700 ? '#ffd8a8' : cct <= 3000 ? '#ffe2bd' : '#fff0dc';
   // лм → кд (изотропный источник) с поправкой на отражения и экспозицию
   const intensity = (lumens / (4 * Math.PI)) * (night ? 0.03 : 0.008);
@@ -306,7 +320,7 @@ export function Scene3D({
   selectedRoomId?: string;
   onSelectFurniture: (id: string | null) => void;
 }) {
-  const style = STYLES[project.style];
+  const style = styleOf(project);
   const pal: Palette = { main: style.fabric, wood: style.wood, fabric: style.fabric, accent: style.accent, metal: style.metal, white: '#f3f2ef' };
   const visible = (l: number) => (opts.allLevels ? true : l <= level);
   const rooms = project.rooms.filter((r) => visible(r.level));

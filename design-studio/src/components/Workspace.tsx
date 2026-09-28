@@ -5,6 +5,7 @@ import { Library } from './Library';
 import { Inspector } from './Inspector';
 import { View3D } from './View3D';
 import { ProjectDoc } from './ProjectDoc';
+import { AssistantPanel } from './AssistantPanel';
 import { buildEstimate, money, num } from '../lib/estimate';
 
 const VIEWS: [View, string][] = [
@@ -18,6 +19,7 @@ export function Workspace() {
   const project = useStore((s) => s.project)!;
   const view = useStore((s) => s.view);
   const level = useStore((s) => s.level);
+  const assistantOpen = useStore((s) => s.assistantOpen);
   const past = useStore((s) => s.past.length);
   const future = useStore((s) => s.future.length);
   const { setView, setLevel, undo, redo, open, mutate, setTool, setPlacing, select } = useStore.getState();
@@ -96,6 +98,9 @@ export function Workspace() {
           </div>
         )}
         <div className="grow" />
+        <button className={'ai-btn' + (assistantOpen ? ' active' : '')} onClick={() => useStore.getState().setAssistantOpen(!assistantOpen)}>
+          ✦ ИИ-дизайнер
+        </button>
         <button className="icon-btn" disabled={!past} onClick={undo} title="Отменить (Ctrl+Z)">
           ↶
         </button>
@@ -109,11 +114,14 @@ export function Workspace() {
       </header>
 
       {view === 'docs' ? (
-        <main className="docs-wrap">
-          <ProjectDoc />
+        <main className={'docs-wrap' + (assistantOpen ? ' with-ai' : '')}>
+          <div className="docs-scroll">
+            <ProjectDoc />
+          </div>
+          {assistantOpen && <AssistantPanel />}
         </main>
       ) : (
-        <main className="main">
+        <main className={'main' + (assistantOpen ? ' with-ai' : '')}>
           <Library />
           <section className={'stage ' + view}>
             {view !== '3d' && (
@@ -130,6 +138,7 @@ export function Workspace() {
           <aside className="panel right">
             <Inspector />
           </aside>
+          {assistantOpen && <AssistantPanel />}
         </main>
       )}
     </div>

@@ -20,6 +20,13 @@ interface State {
   /** Точки калибровки масштаба подложки */
   calib: { x: number; y: number }[];
   setCalib: (c: { x: number; y: number }[]) => void;
+  /** Панель ИИ-ассистента и страницы материалов, отмеченные для показа ИИ ("materialId:page") */
+  assistantOpen: boolean;
+  setAssistantOpen: (v: boolean) => void;
+  aiPages: string[];
+  toggleAiPage: (key: string) => void;
+  /** Добавить проект в список, не открывая его (варианты от ассистента) */
+  addProject: (p: Project) => void;
 
   load: () => Promise<void>;
   open: (id: string | null) => void;
@@ -60,6 +67,14 @@ export const useStore = create<State>((set, get) => ({
   future: [],
   calib: [],
   setCalib: (calib) => set({ calib }),
+  assistantOpen: false,
+  setAssistantOpen: (assistantOpen) => set({ assistantOpen }),
+  aiPages: [],
+  toggleAiPage: (key) => set((s) => ({ aiPages: s.aiPages.includes(key) ? s.aiPages.filter((k) => k !== key) : [...s.aiPages, key] })),
+  addProject: (p) => {
+    set((s) => ({ projects: [p, ...s.projects] }));
+    db.put(p).catch((e) => console.error('Не удалось сохранить проект', e));
+  },
 
   load: async () => {
     try {
@@ -71,7 +86,7 @@ export const useStore = create<State>((set, get) => ({
   },
   open: (id) => {
     const p = id ? get().projects.find((x) => x.id === id) ?? null : null;
-    set({ project: p ? structuredClone(p) : null, selection: null, level: 0, past: [], future: [], placing: null, tool: 'select' });
+    set({ project: p ? structuredClone(p) : null, selection: null, level: 0, past: [], future: [], placing: null, tool: 'select', aiPages: [] });
   },
   create: (p) => {
     set((s) => ({ projects: [p, ...s.projects], project: structuredClone(p), selection: null, level: 0, past: [], future: [], view: 'split' }));

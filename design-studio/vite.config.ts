@@ -8,6 +8,8 @@ export default defineConfig({
     proxy: { '/api': 'http://localhost:8787' },
   },
   build: {
-    chunkSizeWarningLimit: 2000,
+    chunkSizeWarningLimit: 4000,
+    // один JS-файл: так приложение собирается в самодостаточную страницу (npm run build:artifact)
+    rollupOptions: { output: { inlineDynamicImports: true } },
   },
 });

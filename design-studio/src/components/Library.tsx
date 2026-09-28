@@ -7,6 +7,7 @@ import { money, num } from '../lib/estimate';
 import { roomArea } from '../lib/geometry';
 import { FurnitureSymbol, LightSymbol } from './PlanSymbols';
 import { UnderlayPanel } from './UnderlayPanel';
+import { MaterialsPanel } from './MaterialsPanel';
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: 'select', label: 'Выбор', hint: 'Выбор и перемещение (V)' },
@@ -34,7 +35,7 @@ function LThumb({ def }: { def: LightDef }) {
 }
 
 export function Library() {
-  const [tab, setTab] = useState<'plan' | 'furniture' | 'light'>('plan');
+  const [tab, setTab] = useState<'plan' | 'furniture' | 'light' | 'materials'>('plan');
   const [q, setQ] = useState('');
   const project = useStore((s) => s.project)!;
   const tool = useStore((s) => s.tool);
@@ -57,6 +58,9 @@ export function Library() {
         </button>
         <button className={tab === 'light' ? 'active' : ''} onClick={() => setTab('light')}>
           Свет
+        </button>
+        <button className={tab === 'materials' ? 'active' : ''} onClick={() => setTab('materials')}>
+          Материалы
         </button>
       </div>
 
@@ -118,6 +122,8 @@ export function Library() {
           ))}
         </div>
       )}
+
+      {tab === 'materials' && <MaterialsPanel />}
 
       {tab === 'light' && (
         <div className="panel-scroll">

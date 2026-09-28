@@ -1,4 +1,4 @@
-import type { RoomType, StyleId } from '../types';
+import type { Project, Room, RoomType, StyleId } from '../types';
 
 export interface StyleDef {
   id: StyleId;
@@ -129,4 +129,36 @@ export function wallColorFor(style: StyleId, type: RoomType, override?: string) 
 export function floorIdFor(style: StyleId, type: RoomType, override?: string) {
   const s = STYLES[style];
   return override ?? s.floorByRoom[type] ?? s.floor;
+}
+
+/** Стиль проекта с учётом собственной палитры */
+export function styleOf(project: Pick<Project, 'style' | 'custom'>): StyleDef {
+  const base = STYLES[project.style];
+  const c = project.custom;
+  if (!c) return base;
+  const merged: StyleDef = {
+    ...base,
+    name: c.name || base.name,
+    walls: c.walls ?? base.walls,
+    wallsByRoom: c.walls ? {} : base.wallsByRoom,
+    floor: c.floor ?? base.floor,
+    wood: c.wood ?? base.wood,
+    fabric: c.fabric ?? base.fabric,
+    accent: c.accent ?? base.accent,
+    metal: c.metal ?? base.metal,
+    ceiling: c.ceiling ?? base.ceiling,
+    cct: c.cct ?? base.cct,
+  };
+  merged.palette = [merged.walls, merged.wood, merged.fabric, merged.accent, merged.metal];
+  return merged;
+}
+
+export function wallColorOf(project: Pick<Project, 'style' | 'custom'>, room: Pick<Room, 'type' | 'wallColor'>) {
+  const s = styleOf(project);
+  return room.wallColor ?? s.wallsByRoom[room.type] ?? s.walls;
+}
+
+export function floorIdOf(project: Pick<Project, 'style' | 'custom'>, room: Pick<Room, 'type' | 'floorId'>) {
+  const s = styleOf(project);
+  return room.floorId ?? s.floorByRoom[room.type] ?? s.floor;
 }

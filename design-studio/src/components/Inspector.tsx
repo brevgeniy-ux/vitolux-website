@@ -1,8 +1,8 @@
-import type { FurnitureItem, LightItem, Opening, Project, Room, RoomType, StyleId } from '../types';
+import type { FurnitureItem, LightItem, Opening, Project, Room, RoomType, StyleId, WallSide } from '../types';
 import { useStore } from '../store';
 import { ROOM_TYPES, ROOM_TYPE_LIST } from '../data/rooms';
-import { STYLE_LIST, STYLES, floorIdFor, wallColorFor } from '../data/styles';
-import { FLOORS } from '../data/materials';
+import { STYLE_LIST, floorIdOf, styleOf, wallColorOf } from '../data/styles';
+import { FLOORS, WALL_FINISHES } from '../data/materials';
 import { furnitureById } from '../data/furniture';
 import { lightById } from '../data/lights';
 import { roomArea, round2, wallLength } from '../lib/geometry';
@@ -36,7 +36,7 @@ function Num({ label, value, onChange, step = 0.05, min, max, suffix = 'м' }: {
 
 function ProjectProps({ project }: { project: Project }) {
   const mutate = useStore((s) => s.mutate);
-  const style = STYLES[project.style];
+  const style = styleOf(project);
   return (
     <div className="inspector-body">
       <h3>Проект</h3>
@@ -59,12 +59,21 @@ function ProjectProps({ project }: { project: Project }) {
           <option value="house">Дом</option>
         </select>
       </label>
-      <Num label="Высота потолка" value={project.ceilingHeight} min={2.3} max={5} onChange={(v) => mutate((p) => void (p.ceilingHeight = v))} />
+      <Num label="Высота потолка" value={project.ceilingHeight} min={2.3} max={5} onChange={(v) =>
+          mutate((p) => {
+            p.ceilingHeight = v;
+            p.facts = { ...p.facts, ceilingHeight: true };
+          })
+        }
+      />
 
       <h3>Стиль интерьера</h3>
       <div className="style-grid">
         {STYLE_LIST.map((s) => (
-          <button key={s.id} className={'style-chip' + (s.id === project.style ? ' active' : '')} onClick={() => mutate((p) => void (p.style = s.id as StyleId))}>
+          <button key={s.id} className={'style-chip' + (s.id === project.style ? ' active' : '')} onClick={() => mutate((p) => {
+            p.style = s.id as StyleId;
+            delete p.custom;
+          })}>
             <span className="swatches">
               {s.palette.map((c) => (
                 <i key={c} style={{ background: c }} />
@@ -75,6 +84,28 @@ function ProjectProps({ project }: { project: Project }) {
         ))}
       </div>
       <p className="muted small">{style.description}</p>
+      <h3>Палитра проекта{project.custom ? ' · своя' : ''}</h3>
+      <div className="palette-edit">
+        {(
+          [
+            ['walls', 'Стены'],
+            ['wood', 'Дерево'],
+            ['fabric', 'Текстиль'],
+            ['accent', 'Акцент'],
+            ['metal', 'Металл'],
+          ] as const
+        ).map(([k, label]) => (
+          <label key={k}>
+            <input type="color" value={style[k]} onChange={(e) => mutate((p) => void (p.custom = { ...p.custom, [k]: e.target.value }), { history: false })} />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
+      {project.custom && (
+        <button className="link" onClick={() => mutate((p) => void delete p.custom)}>
+          вернуть палитру стиля «{STYLE_LIST.find((x) => x.id === project.style)?.name}»
+        </button>
+      )}
 
       <h3>Автоматизация</h3>
       <div className="btn-col">
@@ -108,7 +139,7 @@ export function Inspector() {
         if (r) fn(r);
       }, { history });
     const lux = luxReport(project, room);
-    const floorId = floorIdFor(project.style, room.type, room.floorId);
+    const floorId = floorIdOf(project, room);
     return (
       <div className="inspector-body">
         <h3>Помещение</h3>
@@ -157,14 +188,56 @@ export function Inspector() {
         <label className="field">
           <span>Цвет стен</span>
           <div className="color-row">
-            <input type="color" value={wallColorFor(project.style, room.type, room.wallColor)} onChange={(e) => up((r) => void (r.wallColor = e.target.value), false)} />
-            {STYLES[project.style].palette.map((c) => (
+            <input type="color" value={wallColorOf(project, room)} onChange={(e) => up((r) => void (r.wallColor = e.target.value), false)} />
+            {styleOf(project).palette.map((c) => (
               <button key={c} className="swatch" style={{ background: c }} onClick={() => up((r) => void (r.wallColor = c))} />
             ))}
             {room.wallColor && (
               <button className="link" onClick={() => up((r) => void delete r.wallColor)}>
                 по стилю
               </button>
+            )}
+          </div>
+        </label>
+        <label className="field">
+          <span>Отделка стен</span>
+          <select value={room.wallFinish ?? 'paint'} onChange={(e) => up((r) => void (e.target.value === 'paint' ? delete r.wallFinish : (r.wallFinish = e.target.value)))}>
+            {WALL_FINISHES.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name} — {money(f.pricePerM2)}/м²
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Акцентная стена</span>
+          <div className="row-inline">
+            <select
+              value={room.accentWall?.side ?? ''}
+              onChange={(e) =>
+                up((r) => {
+                  if (!e.target.value) delete r.accentWall;
+                  else r.accentWall = { finish: r.accentWall?.finish ?? 'slats-oak', ...r.accentWall, side: e.target.value as WallSide };
+                })
+              }
+            >
+              <option value="">нет</option>
+              <option value="n">северная (верх плана)</option>
+              <option value="s">южная (низ)</option>
+              <option value="w">западная (лево)</option>
+              <option value="e">восточная (право)</option>
+            </select>
+            {room.accentWall && (
+              <>
+                <select value={room.accentWall.finish} onChange={(e) => up((r) => void (r.accentWall = { ...r.accentWall!, finish: e.target.value }))}>
+                  {WALL_FINISHES.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+                <input type="color" value={room.accentWall.color ?? wallColorOf(project, room)} onChange={(e) => up((r) => void (r.accentWall = { ...r.accentWall!, color: e.target.value }), false)} />
+              </>
             )}
           </div>
         </label>
@@ -238,7 +311,7 @@ export function Inspector() {
     const f = project.furniture.find((x) => x.id === selection.id);
     const def = f && furnitureById(f.catalogId);
     if (!f || !def) return <ProjectProps project={project} />;
-    const style = STYLES[project.style];
+    const style = styleOf(project);
     const up = (fn: (x: FurnitureItem) => void, history = true) =>
       mutate((p) => {
         const x = p.furniture.find((y) => y.id === f.id);

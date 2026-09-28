@@ -8,9 +8,12 @@ import { furnishProject } from '../lib/autoFurnish';
 import { lightProject } from '../lib/lighting';
 import { aiConcept, aiStatus } from '../lib/api';
 import { inArtifact } from '../lib/platform';
-import { prepareImage, projectFromUploads, recognizePlan, type PreparedImage, type RecognizedPlan } from '../lib/recognize';
+import { ACCEPT_MATERIALS, fileToImages, importMaterial } from '../lib/materials';
+import { completeFromMaterials, reviewProject, sendChat } from '../lib/assistant';
+import type { Material } from '../types';
+import { projectFromUploads, recognizePlan, type PreparedImage, type RecognizedPlan } from '../lib/recognize';
 
-type Mode = 'upload' | 'template' | 'program' | 'ai' | 'blank';
+type Mode = 'chat' | 'upload' | 'materials' | 'template' | 'program' | 'ai' | 'blank';
 
 export function finalize(p: Project, furnish: boolean, light: boolean) {
   if (furnish) p.furniture = furnishProject(p);
@@ -20,7 +23,7 @@ export function finalize(p: Project, furnish: boolean, light: boolean) {
 
 export function NewProjectWizard({ onClose }: { onClose: () => void }) {
   const create = useStore((s) => s.create);
-  const [mode, setMode] = useState<Mode>('upload');
+  const [mode, setMode] = useState<Mode>('chat');
   const [name, setName] = useState('');
   const [client, setClient] = useState('');
   const [kind, setKind] = useState<ProjectKind>('apartment');
@@ -40,12 +43,29 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
   const [over, setOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [materials, setMaterials] = useState<Material[]>([]);
+
+  const addMaterials = async (files: FileList | File[]) => {
+    setErr(null);
+    for (const f of Array.from(files)) {
+      try {
+        const m = await importMaterial(f, (msg) => setProgress(msg));
+        if (mode === 'chat' && m.kind === 'image') m.kind = 'reference';
+        setMaterials((l) => [...l, m]);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    }
+    setProgress(null);
+  };
+
   const addFiles = async (files: FileList | File[]) => {
     setErr(null);
     for (const f of Array.from(files)) {
       try {
-        const img = await prepareImage(f);
-        setImages((l) => [...l, img]);
+        const imgs = await fileToImages(f, (msg) => setProgress(msg));
+        setImages((l) => [...l, ...imgs]);
+        setProgress(null);
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
       }
@@ -89,6 +109,33 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
         st.setView('plan');
         if (!recognized) st.setTool('calibrate');
         onClose();
+        if (aiOk && recognized) {
+          st.setAssistantOpen(true);
+          reviewProject('Проект только что создан из загруженной заказчиком планировки.');
+        }
+        return;
+      } else if (mode === 'materials') {
+        if (!materials.length) throw new Error('Загрузите материалы: PDF, изображения или тексты');
+        p = emptyProject(kind, style);
+        p.name = name || 'Проект по материалам';
+        p.client = client;
+        p.materials = materials;
+        create(p);
+        const st = useStore.getState();
+        st.setAssistantOpen(true);
+        onClose();
+        if (aiOk) completeFromMaterials();
+        return;
+      } else if (mode === 'chat') {
+        p = emptyProject(kind, style);
+        p.name = name || 'Новый проект';
+        p.client = client;
+        p.materials = materials;
+        create(p);
+        const st = useStore.getState();
+        st.setAssistantOpen(true);
+        onClose();
+        if (aiOk && (brief.trim() || materials.length)) sendChat(brief.trim() || 'Вот интерьеры, которые мне нравятся. Что скажете и с чего начнём?', materials.map((m) => m.id));
         return;
       } else if (mode === 'template') {
         p = projectFromTemplate(tpl, style);
@@ -144,10 +191,12 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
           <div className="seg">
             {(
               [
+                ['chat', 'Диалог с ИИ'],
                 ['upload', 'Своя планировка'],
+                ['materials', 'Материалы дизайнера'],
                 ['template', 'Типовая'],
                 ['program', 'По списку'],
-                ['ai', 'AI-бриф'],
+                ['ai', 'Бриф'],
                 ['blank', 'С нуля'],
               ] as [Mode, string][]
             ).map(([m, l]) => (
@@ -156,6 +205,60 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
               </button>
             ))}
           </div>
+
+          {(mode === 'chat' || mode === 'materials') && (
+            <div>
+              <p className="muted small" style={{ marginTop: 0 }}>
+                {mode === 'chat'
+                  ? 'Расскажите об объекте и приложите скриншоты интерьеров, которые нравятся (Pinterest, фото). ИИ-дизайнер разберёт их, задаст вопросы и будет строить проект вместе с вами.'
+                  : 'Загрузите всё, что осталось от прежнего дизайнера: PDF-альбомы, планы, коллажи, визуализации, тексты ТЗ. ИИ изучит материалы, распознает планировку, продолжит концепцию, доделает проект и предложит варианты.'}
+              </p>
+              <div
+                className={'upload-drop' + (over ? ' over' : '')}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setOver(true);
+                }}
+                onDragLeave={() => setOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setOver(false);
+                  addMaterials(e.dataTransfer.files);
+                }}
+              >
+                <b>{mode === 'chat' ? 'Перетащите скриншоты сюда' : 'Перетащите материалы сюда'}</b> или нажмите, чтобы выбрать
+                <br />
+                <span className="small">{mode === 'chat' ? 'JPG, PNG, WebP' : 'PDF, JPG, PNG, WebP, TXT — можно много файлов сразу'}</span>
+              </div>
+              <input ref={fileRef} type="file" accept={mode === 'chat' ? 'image/*' : ACCEPT_MATERIALS} multiple hidden onChange={(e) => e.target.files && addMaterials(e.target.files)} />
+              {materials.length > 0 && (
+                <div className="upload-list">
+                  {materials.map((m) => (
+                    <figure key={m.id}>
+                      {m.pages[0] ? <img src={m.pages[0].dataUrl} alt={m.name} /> : <div className="text-thumb">{m.text.slice(0, 120)}</div>}
+                      <figcaption>
+                        <span title={m.name}>
+                          {m.pages.length > 1 ? `${m.pages.length} стр. · ` : ''}
+                          {m.name.slice(0, 22)}
+                        </span>
+                        <button className="link danger" onClick={() => setMaterials((l) => l.filter((x) => x.id !== m.id))}>
+                          ×
+                        </button>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+              {mode === 'chat' && (
+                <label className="field" style={{ marginTop: 12 }}>
+                  <span>Первое сообщение ИИ-дизайнеру</span>
+                  <textarea rows={3} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="Квартира 72 м² в новостройке, живём вдвоём с собакой, хочется светло и тепло, как на скриншотах…" />
+                </label>
+              )}
+              {aiOk === false && <div className="hint warn">ИИ недоступен{inArtifact() ? ' на этой странице' : ': запустите сервер с ANTHROPIC_API_KEY'} — проект создастся, но без анализа.</div>}
+            </div>
+          )}
 
           {mode === 'upload' && (
             <div>
@@ -175,9 +278,9 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
               >
                 <b>Перетащите сюда изображение планировки</b> или нажмите, чтобы выбрать файл
                 <br />
-                <span className="small">Чертёж БТИ, план от застройщика, скан, фото или рисунок от руки · JPG, PNG, WebP · для дома — по файлу на этаж</span>
+                <span className="small">Чертёж БТИ, план от застройщика, скан, фото или рисунок от руки · PDF, JPG, PNG, WebP · для дома — по странице на этаж (лишние страницы PDF удалите крестиком)</span>
               </div>
-              <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+              <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
               {images.length > 0 && (
                 <div className="upload-list">
                   {images.map((im, i) => (
@@ -221,7 +324,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {(mode === 'upload' || mode === 'program' || mode === 'ai' || mode === 'blank') && (
+          {mode !== 'template' && (
             <div className="seg small">
               <button className={kind === 'apartment' ? 'active' : ''} onClick={() => setKind('apartment')}>
                 Квартира
@@ -296,7 +399,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {mode !== 'ai' && (
+          {mode !== 'ai' && mode !== 'chat' && mode !== 'materials' && (
             <>
               <h4>Стиль</h4>
               <div className="style-grid">
@@ -314,7 +417,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
             </>
           )}
 
-          {mode !== 'blank' && (
+          {mode !== 'blank' && mode !== 'chat' && mode !== 'materials' && (
             <div className="checks">
               <label>
                 <input type="checkbox" checked={furnish} onChange={(e) => setFurnish(e.target.checked)} /> Автоматически расставить мебель
@@ -324,7 +427,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
               </label>
             </div>
           )}
-          {progress && busy && <div className="hint">{progress}</div>}
+          {progress && <div className="hint">{progress}</div>}
           {err && <div className="hint warn">{err}</div>}
         </div>
         <footer>

@@ -38,6 +38,10 @@ export interface Room {
   /** Переопределения отделки (иначе берутся из стиля) */
   wallColor?: string;
   floorId?: string;
+  /** Отделка стен (каталог WALL_FINISHES), по умолчанию — покраска */
+  wallFinish?: string;
+  /** Акцентная стена с отдельной отделкой */
+  accentWall?: { side: WallSide; finish: string; color?: string };
 }
 
 export interface Opening {
@@ -96,6 +100,50 @@ export interface Underlay {
   visible: boolean;
 }
 
+/** Страница материала (PDF-страница или изображение), приведённая к картинке */
+export interface MaterialPage {
+  dataUrl: string;
+  w: number;
+  h: number;
+}
+
+/** Материал от заказчика или прошлого дизайнера */
+export interface Material {
+  id: string;
+  name: string;
+  kind: 'pdf' | 'image' | 'text' | 'reference';
+  pages: MaterialPage[];
+  /** Извлечённый текст (PDF, текстовые файлы) */
+  text: string;
+  addedAt: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  /** Приложенные к сообщению изображения (id материалов-референсов) */
+  attachments?: string[];
+  /** Что ассистент изменил в проекте */
+  actions?: string[];
+  /** Предложенные варианты, которые можно создать одним кликом */
+  variants?: { name: string; style: StyleId; idea: string }[];
+  error?: boolean;
+  at: number;
+}
+
+export interface CustomDesign {
+  name?: string;
+  walls?: string;
+  wood?: string;
+  fabric?: string;
+  accent?: string;
+  metal?: string;
+  ceiling?: string;
+  floor?: string;
+  cct?: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -113,6 +161,12 @@ export interface Project {
   lights: LightItem[];
   renders: Render[];
   underlays?: Underlay[];
+  /** Собственная палитра поверх пресета стиля (например, подобранная ИИ по референсам) */
+  custom?: CustomDesign;
+  /** Какие исходные данные подтверждены заказчиком или найдены на чертеже */
+  facts?: { ceilingHeight?: boolean; residents?: string; budget?: string };
+  materials?: Material[];
+  chat?: ChatMessage[];
   createdAt: number;
   updatedAt: number;
 }

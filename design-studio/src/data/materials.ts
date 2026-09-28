@@ -29,6 +29,42 @@ export const FLOORS: FloorMaterial[] = [
 
 export const floorById = (id: string) => FLOORS.find((f) => f.id === id) ?? FLOORS[0];
 
+export type WallPattern = 'paint' | 'plaster' | 'wallpaper' | 'brick' | 'slats' | 'tile' | 'microcement' | 'stone' | 'panels';
+
+export interface WallFinish {
+  id: string;
+  name: string;
+  pattern: WallPattern;
+  /** Цвет берётся из цвета стен помещения (иначе — собственный цвет материала) */
+  tinted: boolean;
+  color: string;
+  accent: string;
+  /** Размер модуля текстуры, м */
+  tile: number;
+  roughness: number;
+  /** Материал + работа, грн/м² */
+  pricePerM2: number;
+}
+
+export const WALL_FINISHES: WallFinish[] = [
+  { id: 'paint', name: 'Покраска, моющаяся краска', pattern: 'paint', tinted: true, color: '#f2f0eb', accent: '#e6e3dc', tile: 1, roughness: 0.92, pricePerM2: 450 },
+  { id: 'plaster', name: 'Декоративная штукатурка', pattern: 'plaster', tinted: true, color: '#e8e2d8', accent: '#d8d0c3', tile: 1.5, roughness: 0.95, pricePerM2: 1150 },
+  { id: 'microcement-wall', name: 'Микроцемент', pattern: 'microcement', tinted: true, color: '#bdb8b0', accent: '#a7a29a', tile: 2, roughness: 0.8, pricePerM2: 1900 },
+  { id: 'wallpaper-linen', name: 'Флизелиновые обои «лён»', pattern: 'wallpaper', tinted: true, color: '#e4ddd0', accent: '#d2c9ba', tile: 0.53, roughness: 0.9, pricePerM2: 620 },
+  { id: 'wallpaper-stripe', name: 'Обои в тонкую полоску', pattern: 'wallpaper', tinted: true, color: '#dfe3e0', accent: '#c7ccc8', tile: 0.53, roughness: 0.9, pricePerM2: 680 },
+  { id: 'brick-red', name: 'Кирпич старый (клинкерная плитка)', pattern: 'brick', tinted: false, color: '#9d5a43', accent: '#d8cfc4', tile: 0.5, roughness: 0.95, pricePerM2: 1650 },
+  { id: 'brick-white', name: 'Кирпич, окрашенный в белый', pattern: 'brick', tinted: false, color: '#ece9e3', accent: '#cfcac1', tile: 0.5, roughness: 0.95, pricePerM2: 1500 },
+  { id: 'slats-oak', name: 'Реечные панели, дуб', pattern: 'slats', tinted: false, color: '#b58a5e', accent: '#3a2e25', tile: 0.6, roughness: 0.6, pricePerM2: 3200 },
+  { id: 'slats-walnut', name: 'Реечные панели, орех', pattern: 'slats', tinted: false, color: '#6b4a34', accent: '#2a1e17', tile: 0.6, roughness: 0.55, pricePerM2: 3600 },
+  { id: 'panels-mdf', name: 'Стеновые панели МДФ с молдингами', pattern: 'panels', tinted: true, color: '#e9e4da', accent: '#d6cfc2', tile: 1.2, roughness: 0.7, pricePerM2: 2400 },
+  { id: 'tile-white', name: 'Настенная плитка 30×60, белая', pattern: 'tile', tinted: false, color: '#f1f1ee', accent: '#cfcfca', tile: 0.6, roughness: 0.25, pricePerM2: 1650 },
+  { id: 'tile-zellige', name: 'Плитка зеллиж 10×10', pattern: 'tile', tinted: true, color: '#9fb3a8', accent: '#e8e6df', tile: 0.2, roughness: 0.2, pricePerM2: 2900 },
+  { id: 'marble-wall', name: 'Керамогранит под мрамор 60×120', pattern: 'stone', tinted: false, color: '#efece7', accent: '#b8b2aa', tile: 1.2, roughness: 0.15, pricePerM2: 2300 },
+  { id: 'stone-travertine', name: 'Травертин', pattern: 'stone', tinted: false, color: '#d9c9ae', accent: '#bba888', tile: 0.6, roughness: 0.6, pricePerM2: 3400 },
+];
+
+export const wallFinishById = (id?: string) => WALL_FINISHES.find((f) => f.id === id) ?? WALL_FINISHES[0];
+
 /** Цены на черновые/отделочные материалы и работы для сметы, грн */
 export const RATES = {
   paintPerLiter: 420,

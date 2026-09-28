@@ -4,7 +4,7 @@ import { ROOM_TYPES } from '../data/rooms';
 import { furnitureById } from '../data/furniture';
 import { lightById } from '../data/lights';
 import { floorById } from '../data/materials';
-import { floorIdFor } from '../data/styles';
+import { floorIdOf } from '../data/styles';
 import { WALL_T, levelBounds, openingWorld, roomArea, wallGaps, wallLength } from '../lib/geometry';
 import { FurnitureSymbol, LightSymbol } from './PlanSymbols';
 
@@ -260,7 +260,7 @@ export function Plan({
 
       {/* Помещения */}
       {rooms.map((r) => {
-        const floor = floorById(floorIdFor(project.style, r.type, r.floorId));
+        const floor = floorById(floorIdOf(project, r));
         const fill = mode === 'floors' ? floor.base : ROOM_TYPES[r.type].planColor;
         const isSel = sel?.kind === 'room' && sel.id === r.id;
         return (
@@ -327,7 +327,7 @@ export function Plan({
             </text>
             {mode === 'floors' && (
               <text x={r.x + r.w / 2} y={r.y + r.d / 2 + fs * 2} fontSize={fs * 0.7} fill="#374151">
-                {floorById(floorIdFor(project.style, r.type, r.floorId)).name}
+                {floorById(floorIdOf(project, r)).name}
               </text>
             )}
           </g>

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useStore } from '../store';
 import type { Project } from '../types';
-import { STYLES } from '../data/styles';
+import { styleOf } from '../data/styles';
 import { furnitureById } from '../data/furniture';
 import { lightById } from '../data/lights';
 import { floorById } from '../data/materials';
@@ -63,7 +63,7 @@ export function ProjectDoc() {
       setMsg(e instanceof Error ? e.message : 'Не удалось сохранить файл');
       setTimeout(() => setMsg(null), 3000);
     });
-  const style = STYLES[project.style];
+  const style = styleOf(project);
   const est = buildEstimate(project);
   const levels = [...new Set(project.rooms.map((r) => r.level))].sort();
   const totalArea = est.area;
@@ -265,6 +265,8 @@ export function ProjectDoc() {
                 <td>{num(f.perimeter)}</td>
                 <td>
                   <i className="dot" style={{ background: f.wallColor }} /> {f.wallColor.toUpperCase()}
+                  <br />
+                  <small>{f.wallFinishName}</small>
                 </td>
                 <td>{num(f.paintArea)}</td>
                 <td>{num(f.tileArea)}</td>
@@ -284,7 +286,7 @@ export function ProjectDoc() {
             </tr>
           </tbody>
         </table>
-        <p className="note">Потолки — {STYLES[project.style].ceiling.toUpperCase()}, высота {num(project.ceilingHeight)} м. Площади стен даны за вычетом проёмов.</p>
+        <p className="note">Потолки — {styleOf(project).ceiling.toUpperCase()}, высота {num(project.ceilingHeight)} м. Площади стен даны за вычетом проёмов.</p>
       </Sheet>
 
       <Sheet project={project} title="Спецификация мебели" total={total}>
