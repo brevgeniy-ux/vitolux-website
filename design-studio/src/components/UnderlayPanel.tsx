@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { alignedUnderlay, makeUnderlay, planToRooms, prepareImage, recognizePlan, type PreparedImage } from '../lib/recognize';
+import { alignedUnderlay, makeUnderlay, planToRooms, recognizePlan, type PreparedImage } from '../lib/recognize';
+import { fileToImages } from '../lib/materials';
 import { aiStatus } from '../lib/api';
 import { round2 } from '../lib/geometry';
 
@@ -27,7 +28,8 @@ export function UnderlayPanel() {
   const upload = async (file: File) => {
     setMsg(null);
     try {
-      const img = await prepareImage(file);
+      setMsg({ text: `Читаю «${file.name}»…` });
+      const img = (await fileToImages(file, (m) => setMsg({ text: m })))[0];
       mutate((p) => {
         p.underlays = (p.underlays ?? []).filter((x) => x.level !== level);
         p.underlays.push(makeUnderlay(img, level));
@@ -97,13 +99,22 @@ export function UnderlayPanel() {
   return (
     <div className="underlay-panel">
       <h4>Планировка заказчика{project.levels > 1 ? ` · ${level + 1} эт.` : ''}</h4>
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf,.pdf,image/*"
+        hidden
+        onChange={(e) => {
+          if (e.target.files?.[0]) upload(e.target.files[0]);
+          e.target.value = '';
+        }}
+      />
       {!u ? (
         <>
           <button className="btn full" onClick={() => fileRef.current?.click()}>
             Загрузить изображение плана
           </button>
-          <p className="muted small">Чертёж, скан, фото или рисунок от руки (JPG, PNG). Его можно распознать автоматически или обвести вручную.</p>
+          <p className="muted small">Чертёж, скан, фото или рисунок от руки (PDF — берётся первая страница, JPG, PNG). Его можно распознать автоматически или обвести вручную.</p>
         </>
       ) : (
         <>

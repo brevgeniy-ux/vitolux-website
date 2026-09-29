@@ -53,7 +53,10 @@ export function MaterialsPanel() {
 
   return (
     <div className="panel-scroll">
-      <input ref={fileRef} type="file" accept={ACCEPT_MATERIALS} multiple hidden onChange={(e) => e.target.files && upload(e.target.files)} />
+      <input ref={fileRef} type="file" accept={ACCEPT_MATERIALS} multiple hidden onChange={(e) => {
+          if (e.target.files) upload(e.target.files);
+          e.target.value = '';
+        }} />
       <div
         className="upload-drop small-drop"
         onClick={() => fileRef.current?.click()}

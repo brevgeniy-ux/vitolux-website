@@ -135,7 +135,15 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
         const st = useStore.getState();
         st.setAssistantOpen(true);
         onClose();
-        if (aiOk && (brief.trim() || materials.length)) sendChat(brief.trim() || 'Вот интерьеры, которые мне нравятся. Что скажете и с чего начнём?', materials.map((m) => m.id));
+        if (aiOk) {
+          const refs = materials.filter((m) => m.kind === 'reference');
+          const docs = materials.filter((m) => m.kind !== 'reference');
+          (async () => {
+            // планировка и документы — полный разбор с распознаванием плана, затем диалог
+            if (docs.length) await completeFromMaterials();
+            if (brief.trim() || refs.length) await sendChat(brief.trim() || 'Вот интерьеры, которые мне нравятся. Что скажете и как перенести это в проект?', refs.map((m) => m.id));
+          })();
+        }
         return;
       } else if (mode === 'template') {
         p = projectFromTemplate(tpl, style);
@@ -210,7 +218,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
             <div>
               <p className="muted small" style={{ marginTop: 0 }}>
                 {mode === 'chat'
-                  ? 'Расскажите об объекте и приложите скриншоты интерьеров, которые нравятся (Pinterest, фото). ИИ-дизайнер разберёт их, задаст вопросы и будет строить проект вместе с вами.'
+                  ? 'Расскажите об объекте и приложите скриншоты интерьеров, которые нравятся (Pinterest, фото), и планировку — картинкой или PDF. ИИ-дизайнер разберёт всё, задаст вопросы и будет строить проект вместе с вами.'
                   : 'Загрузите всё, что осталось от прежнего дизайнера: PDF-альбомы, планы, коллажи, визуализации, тексты ТЗ. ИИ изучит материалы, распознает планировку, продолжит концепцию, доделает проект и предложит варианты.'}
               </p>
               <div
@@ -227,11 +235,14 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
                   addMaterials(e.dataTransfer.files);
                 }}
               >
-                <b>{mode === 'chat' ? 'Перетащите скриншоты сюда' : 'Перетащите материалы сюда'}</b> или нажмите, чтобы выбрать
+                <b>{mode === 'chat' ? 'Перетащите скриншоты, планировку или PDF сюда' : 'Перетащите материалы сюда'}</b> или нажмите, чтобы выбрать
                 <br />
-                <span className="small">{mode === 'chat' ? 'JPG, PNG, WebP' : 'PDF, JPG, PNG, WebP, TXT — можно много файлов сразу'}</span>
+                <span className="small">{mode === 'chat' ? 'Скриншоты (JPG, PNG, WebP), планировка или материалы в PDF' : 'PDF, JPG, PNG, WebP, TXT — можно много файлов сразу'}</span>
               </div>
-              <input ref={fileRef} type="file" accept={mode === 'chat' ? 'image/*' : ACCEPT_MATERIALS} multiple hidden onChange={(e) => e.target.files && addMaterials(e.target.files)} />
+              <input ref={fileRef} type="file" accept={ACCEPT_MATERIALS} multiple hidden onChange={(e) => {
+                  if (e.target.files) addMaterials(e.target.files);
+                  e.target.value = '';
+                }} />
               {materials.length > 0 && (
                 <div className="upload-list">
                   {materials.map((m) => (
@@ -280,7 +291,10 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
                 <br />
                 <span className="small">Чертёж БТИ, план от застройщика, скан, фото или рисунок от руки · PDF, JPG, PNG, WebP · для дома — по странице на этаж (лишние страницы PDF удалите крестиком)</span>
               </div>
-              <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+              <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*" multiple hidden onChange={(e) => {
+                  if (e.target.files) addFiles(e.target.files);
+                  e.target.value = '';
+                }} />
               {images.length > 0 && (
                 <div className="upload-list">
                   {images.map((im, i) => (

@@ -5,6 +5,7 @@ import { STYLES } from '../data/styles';
 import { aiAvailable } from '../lib/ai';
 import { completeFromMaterials, createVariant, greeting, sendChat } from '../lib/assistant';
 import { prepareImage } from '../lib/recognize';
+import { ACCEPT_MATERIALS, importMaterial } from '../lib/materials';
 import { uid } from '../lib/geometry';
 import { inArtifact } from '../lib/platform';
 
@@ -26,6 +27,7 @@ export function AssistantPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [ai, setAi] = useState<boolean | null>(null);
   const [over, setOver] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const chat = project.chat ?? [];
@@ -40,7 +42,19 @@ export function AssistantPanel() {
 
   const addImages = async (files: FileList | File[]) => {
     for (const f of Array.from(files)) {
-      if (!f.type.startsWith('image/')) continue;
+      if (!f.type.startsWith('image/')) {
+        // PDF и тексты — как материалы проекта (планировки, альбомы)
+        try {
+          setBusy(`Читаю «${f.name}»…`);
+          const m = await importMaterial(f, (msg) => setBusy(msg));
+          setPending((l) => [...l, m]);
+        } catch (e) {
+          setNote(e instanceof Error ? e.message : String(e));
+        } finally {
+          setBusy(null);
+        }
+        continue;
+      }
       try {
         const img = await prepareImage(f);
         setPending((l) => [...l, { id: uid(), name: f.name && f.name !== 'image.png' ? f.name : `Референс ${mats.length + l.length + 1}`, kind: 'reference', pages: [{ dataUrl: img.dataUrl, w: img.w, h: img.h }], text: '', addedAt: Date.now() }]);
@@ -51,7 +65,9 @@ export function AssistantPanel() {
   };
 
   const send = async (msg?: string) => {
-    const body = (msg ?? text).trim() || (pending.length ? 'Мне нравится вот это. Что скажете и как перенести это в мой проект?' : '');
+    const body =
+      (msg ?? text).trim() ||
+      (pending.some((m) => m.kind !== 'reference') ? 'Вот материалы по проекту (планировка/документы). Изучите их и предложите, как действовать.' : pending.length ? 'Мне нравится вот это. Что скажете и как перенести это в мой проект?' : '');
     if (!body || busy) return;
     const att = pending;
     setText('');
@@ -168,19 +184,21 @@ export function AssistantPanel() {
           <div className="pending">
             {pending.map((m) => (
               <figure key={m.id}>
-                <img src={m.pages[0].dataUrl} alt="" />
+                {m.pages[0] ? <img src={m.pages[0].dataUrl} alt="" /> : <span className="file-chip">{m.name.slice(0, 10)}</span>}
+                {m.pages.length > 1 && <em className="page-count">{m.pages.length} стр.</em>}
                 <button onClick={() => setPending((l) => l.filter((x) => x.id !== m.id))}>×</button>
               </figure>
             ))}
           </div>
         )}
+        {note && <div className="hint warn">{note}</div>}
         {aiPages.length > 0 && <div className="muted small">+ отмеченных страниц материалов: {aiPages.length}</div>}
         <textarea
           id="assistant-input"
           rows={3}
           value={text}
           disabled={!ai}
-          placeholder="Напишите пожелание или вставьте скриншот (Ctrl+V)…"
+          placeholder="Напишите пожелание, вставьте скриншот (Ctrl+V) или перетащите PDF…"
           onChange={(e) => setText(e.target.value)}
           onPaste={(e) => {
             const files = [...e.clipboardData.files];
@@ -197,9 +215,19 @@ export function AssistantPanel() {
           }}
         />
         <div className="composer-row">
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addImages(e.target.files)} />
-          <button className="btn sm" onClick={() => fileRef.current?.click()} disabled={!ai} title="Приложить скриншоты интерьеров, которые нравятся">
-            📎 Референсы
+          <input
+            ref={fileRef}
+            type="file"
+            accept={ACCEPT_MATERIALS}
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) addImages(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          <button className="btn sm" onClick={() => fileRef.current?.click()} disabled={!ai} title="Приложить скриншоты интерьеров, планировку или материалы (PDF)">
+            📎 Файлы
           </button>
           <div className="grow" />
           <button className="btn sm primary" onClick={() => send()} disabled={!!busy || !ai || (!text.trim() && !pending.length)}>

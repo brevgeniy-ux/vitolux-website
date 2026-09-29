@@ -7,23 +7,57 @@ const MAX_PDF_PAGES = 40;
 const PAGE_PIXELS = 1_150_000;
 
 let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
+let mainThread = false;
 
-/** pdf.js с воркером из blob: — работает и локально, и на странице-артефакте */
+/** pdf.js: сначала фоновый воркер из blob:, при запрете (например, в просмотрщике claude.ai) — разбор в основном потоке */
 function loadPdfjs() {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
-      const [pdfjs, worker] = await Promise.all([import('pdfjs-dist'), import('pdfjs-dist/build/pdf.worker.min.mjs?raw')]);
-      const url = URL.createObjectURL(new Blob([worker.default], { type: 'text/javascript' }));
-      pdfjs.GlobalWorkerOptions.workerPort = new Worker(url, { type: 'module' });
+      const pdfjs = await import('pdfjs-dist');
+      try {
+        const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?raw');
+        const url = URL.createObjectURL(new Blob([worker.default], { type: 'text/javascript' }));
+        pdfjs.GlobalWorkerOptions.workerPort = new Worker(url, { type: 'module' });
+      } catch {
+        await useMainThread(pdfjs);
+      }
       return pdfjs;
     })();
   }
   return pdfjsPromise;
 }
 
-export async function pdfToPages(file: File, onProgress?: (done: number, total: number) => void): Promise<{ pages: MaterialPage[]; text: string; total: number }> {
+async function useMainThread(pdfjs: typeof import('pdfjs-dist')) {
+  if (mainThread) return;
+  const mod = await import('pdfjs-dist/build/pdf.worker.min.mjs');
+  (globalThis as unknown as { pdfjsWorker: unknown }).pdfjsWorker = { WorkerMessageHandler: mod.WorkerMessageHandler };
+  pdfjs.GlobalWorkerOptions.workerPort = null;
+  mainThread = true;
+}
+
+async function openPdf(bytes: Uint8Array) {
   const pdfjs = await loadPdfjs();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const open = () => pdfjs.getDocument({ data: bytes.slice() }).promise;
+  if (mainThread) return open();
+  try {
+    // воркер может молча не запуститься — ждём не дольше 15 с
+    return await Promise.race([open(), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000))]);
+  } catch (e) {
+    const name = (e as { name?: string }).name;
+    if (name === 'PasswordException') throw new Error('PDF защищён паролем — снимите защиту и загрузите снова');
+    if (name === 'InvalidPDFException') throw new Error('Файл повреждён или это не PDF');
+    await useMainThread(pdfjs);
+    return open();
+  }
+}
+
+export async function pdfToPages(file: File, onProgress?: (done: number, total: number) => void): Promise<{ pages: MaterialPage[]; text: string; total: number }> {
+  let doc;
+  try {
+    doc = await openPdf(new Uint8Array(await file.arrayBuffer()));
+  } catch (e) {
+    throw new Error(`Не удалось открыть PDF «${file.name}»: ${e instanceof Error ? e.message : String(e)}`);
+  }
   const total = doc.numPages;
   const n = Math.min(total, MAX_PDF_PAGES);
   const pages: MaterialPage[] = [];
