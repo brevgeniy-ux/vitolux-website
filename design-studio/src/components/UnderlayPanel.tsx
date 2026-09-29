@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { alignedUnderlay, makeUnderlay, planToRooms, recognizePlan, type PreparedImage } from '../lib/recognize';
-import { fileToImages } from '../lib/materials';
+import { dataUrlToBlob, fileToImages } from '../lib/materials';
 import { aiStatus } from '../lib/api';
 import { round2 } from '../lib/geometry';
 
@@ -67,7 +67,7 @@ export function UnderlayPanel() {
     setBusy(true);
     setMsg({ text: 'Claude распознаёт планировку… обычно 30–90 секунд.' });
     try {
-      const blob = await (await fetch(u.dataUrl)).blob();
+      const blob = dataUrlToBlob(u.dataUrl);
       const img: PreparedImage = { dataUrl: u.dataUrl, blob, w: u.pxW, h: u.pxH, name: 'plan.jpg' };
       const plan = await recognizePlan(img, project.kind, '');
       const { rooms, openings } = planToRooms(plan, level);

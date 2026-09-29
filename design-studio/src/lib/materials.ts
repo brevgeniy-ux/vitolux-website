@@ -117,7 +117,7 @@ export async function fileToImages(file: File, onProgress?: (msg: string) => voi
 }
 
 export async function pageBlob(p: MaterialPage): Promise<Blob> {
-  return (await fetch(p.dataUrl)).blob();
+  return dataUrlToBlob(p.dataUrl);
 }
 
 /** Все страницы материалов в виде плоского списка с подписями */
@@ -126,3 +126,18 @@ export function allPages(materials: Material[]) {
 }
 
 export const ACCEPT_MATERIALS = 'application/pdf,.pdf,image/*,text/plain,.txt,.md';
+
+/** data:-URL → Blob без fetch (в просмотрщике claude.ai fetch к data: запрещён) */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(',');
+  const meta = dataUrl.slice(5, comma);
+  const type = meta.split(';')[0] || 'application/octet-stream';
+  const body = dataUrl.slice(comma + 1);
+  if (meta.includes(';base64')) {
+    const bin = atob(body);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type });
+  }
+  return new Blob([decodeURIComponent(body)], { type });
+}
