@@ -234,3 +234,22 @@ export function projectFromUploads(kind: ProjectKind, style: StyleId, name: stri
   if (notes.length) p.notes = 'Распознавание планировки: ' + notes.join(' ');
   return { project: p, notes };
 }
+
+/** Уменьшенная JPEG-копия изображения (для отправки ИИ) */
+export async function downscaleBlob(dataUrl: string, maxPixels: number): Promise<Blob> {
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('не удалось прочитать изображение'));
+    i.src = dataUrl;
+  });
+  const k = Math.min(1, Math.sqrt(maxPixels / (img.naturalWidth * img.naturalHeight)));
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(img.naturalWidth * k));
+  cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+  const g = cv.getContext('2d')!;
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, cv.width, cv.height);
+  g.drawImage(img, 0, 0, cv.width, cv.height);
+  return new Promise<Blob>((res) => cv.toBlob((b) => res(b!), 'image/jpeg', 0.9));
+}

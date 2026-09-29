@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { alignedUnderlay, makeUnderlay, planToRooms, recognizePlan, type PreparedImage } from '../lib/recognize';
-import { buildFromUnderlay, parseExplication } from '../lib/localRecognize';
+import { alignedUnderlay, downscaleBlob, makeUnderlay, planToRooms, recognizePlan, type PreparedImage } from '../lib/recognize';
+import { ScaleNeeded, buildFromUnderlay, parseExplication } from '../lib/localRecognize';
 import { aiMaxImages } from '../lib/ai';
 import { furnishProject } from '../lib/autoFurnish';
 import { lightProject } from '../lib/lighting';
 import type { Opening, Room, Underlay } from '../types';
-import { dataUrlToBlob, fileToImages } from '../lib/materials';
+import { fileToImages } from '../lib/materials';
 import { aiStatus } from '../lib/api';
 import { round2 } from '../lib/geometry';
 
@@ -23,6 +23,8 @@ export function UnderlayPanel() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; warn?: boolean } | null>(null);
   const [ai, setAi] = useState(false);
+  const [needArea, setNeedArea] = useState(false);
+  const [area, setArea] = useState('');
   const [confirmReplace, setConfirmReplace] = useState<'auto' | 'local' | null>(null);
   const roomsOnLevel = project.rooms.filter((r) => r.level === level).length;
 
@@ -39,12 +41,12 @@ export function UnderlayPanel() {
         p.underlays = (p.underlays ?? []).filter((x) => x.level !== level);
         p.underlays.push(makeUnderlay(img, level));
       });
-      setTool('crop');
+      setTool('select');
       const rows = parseExplication(img.text ?? '');
       setMsg({
         text:
-          'Подложка загружена. Шаг 1: обведите мышью рамкой сам план (без штампа, таблиц и картинок). Шаг 2: нажмите «Распознать помещения».' +
-          (rows.length ? ` Найдена экспликация (${rows.length} помещ.) — масштаб и названия определятся автоматически.` : ' Если на листе нет таблицы площадей, перед распознаванием задайте «Масштаб».'),
+          'Подложка загружена. Нажмите «Распознать помещения» — система сама найдёт план на листе (если найдёт не то, обведите план кнопкой «Рамка»).' +
+          (rows.length ? ` Найдена экспликация (${rows.length} помещ.) — масштаб и названия определятся автоматически.` : ' Таблица площадей в тексте PDF не найдена — система попросит ввести общую площадь.'),
       });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : String(e), warn: true });
@@ -86,8 +88,20 @@ export function UnderlayPanel() {
     });
 
   const recognizeLocal = async (prefix = '') => {
-    const res = await buildFromUnderlay(u!, level);
-    applyRooms(res.rooms, res.openings, { mPerPx: res.mPerPx, calibrated: true });
+    const fresh = useStore.getState().project?.underlays?.find((x) => x.id === u!.id) ?? u!;
+    let res;
+    try {
+      res = await buildFromUnderlay(fresh, level);
+    } catch (e) {
+      if (e instanceof ScaleNeeded) {
+        setNeedArea(true);
+        setMsg({ text: e.message });
+        return;
+      }
+      throw e;
+    }
+    setNeedArea(false);
+    applyRooms(res.rooms, res.openings, { mPerPx: res.mPerPx, calibrated: true, crop: res.crop });
     setMsg({ text: `${prefix}Распознано помещений: ${res.rooms.length}, дверей и окон: ${res.openings.length}. ${res.notes} Мебель и свет расставлены. Проверьте размеры и назначение помещений и поправьте при необходимости.` });
   };
 
@@ -104,7 +118,7 @@ export function UnderlayPanel() {
       }
       setMsg({ text: 'Claude распознаёт планировку… обычно 30–90 секунд.' });
       try {
-        const blob = dataUrlToBlob(u.dataUrl);
+        const blob = await downscaleBlob(u.dataUrl, 1_150_000);
         const img: PreparedImage = { dataUrl: u.dataUrl, blob, w: u.pxW, h: u.pxH, name: 'plan.jpg' };
         const plan = await recognizePlan(img, project.kind, u.text ? `Текст с листа: ${u.text.slice(0, 1500)}` : '');
         const { rooms, openings } = planToRooms(plan, level);
@@ -188,6 +202,36 @@ export function UnderlayPanel() {
             </div>
           )}
           {tool === 'underlay' && <span className="muted small">Перетащите план мышью, чтобы совместить подложку с помещениями.</span>}
+          {needArea && (
+            <div className="calib">
+              <span className="small">Общая площадь по экспликации, м²:</span>
+              <div className="row-inline">
+                <input
+                  autoFocus
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  placeholder="напр. 80,7"
+                  style={{ width: 90 }}
+                  onKeyDown={(e) => e.key === 'Enter' && document.getElementById('area-apply')?.click()}
+                />
+                <button
+                  id="area-apply"
+                  className="btn sm primary"
+                  onClick={() => {
+                    const v = parseFloat(area.replace(',', '.'));
+                    if (!(v > 5)) return setMsg({ text: 'Введите площадь числом, например 80,7', warn: true });
+                    mutate((p) => {
+                      const x = p.underlays?.find((y) => y.id === u.id);
+                      if (x) x.totalArea = v;
+                    });
+                    setTimeout(() => recognize('local'), 0);
+                  }}
+                >
+                  Распознать
+                </button>
+              </div>
+            </div>
+          )}
           {confirmReplace ? (
             <div className="hint">
               Помещения этажа ({roomsOnLevel}) будут заменены распознанными, мебель и свет этажа — расставлены заново.

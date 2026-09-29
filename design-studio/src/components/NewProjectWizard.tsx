@@ -8,6 +8,7 @@ import { furnishProject } from '../lib/autoFurnish';
 import { lightProject } from '../lib/lighting';
 import { aiConcept, aiStatus } from '../lib/api';
 import { aiMaxImages } from '../lib/ai';
+import { buildFromUnderlay } from '../lib/localRecognize';
 import { inArtifact } from '../lib/platform';
 import { ACCEPT_MATERIALS, fileToImages, importMaterial } from '../lib/materials';
 import { completeFromMaterials, reviewProject, sendChat } from '../lib/assistant';
@@ -110,8 +111,26 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
         create(finalize(p, furnish && recognized, light && recognized));
         const st = useStore.getState();
         st.setView('plan');
-        if (!recognized) st.setTool('crop');
         onClose();
+        if (!recognized) {
+          // распознавание по линиям чертежа — без ИИ
+          for (const u of p.underlays ?? []) {
+            try {
+              const res = await buildFromUnderlay(u, u.level);
+              st.mutate((pr) => {
+                pr.rooms = pr.rooms.filter((r) => r.level !== u.level).concat(res.rooms);
+                pr.openings = pr.openings.concat(res.openings);
+                const x = pr.underlays?.find((y) => y.id === u.id);
+                if (x) Object.assign(x, { mPerPx: res.mPerPx, calibrated: true, crop: res.crop, opacity: 0.45 });
+                pr.furniture = furnishProject(pr);
+                pr.lights = lightProject(pr);
+              });
+            } catch {
+              /* масштаб или помещения не определились — пользователь продолжит в блоке «Планировка заказчика» */
+            }
+          }
+          st.setView('split');
+        }
         if (aiOk && recognized) {
           st.setAssistantOpen(true);
           reviewProject('Проект только что создан из загруженной заказчиком планировки.');
@@ -323,7 +342,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
                 </label>
               ) : (
                 <p className="muted small">
-                  {aiOk ? 'ИИ в этом окне не может смотреть изображения, поэтому' : 'ИИ не подключён, поэтому'} план распознается по линиям чертежа: после создания обведите рамкой сам план на листе и нажмите «Распознать помещения». Масштаб и названия помещений берутся из экспликации в PDF, если она есть, иначе задайте масштаб по известному размеру.
+                  {aiOk ? 'ИИ в этом окне не может смотреть изображения, поэтому' : 'ИИ не подключён, поэтому'} план распознается по линиям чертежа: система сама найдёт план на листе, масштаб и названия возьмёт из экспликации в PDF. Если таблицы площадей нет, после создания попросит ввести общую площадь.
                 </p>
               )}
               <p className="muted small">После создания изображение остаётся подложкой под планом — по нему удобно проверить и поправить размеры.</p>

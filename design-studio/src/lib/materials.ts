@@ -1,7 +1,7 @@
 // Импорт материалов: PDF (страницы → изображения + текст), изображения, текстовые файлы.
 import type { Material, MaterialPage } from '../types';
 import { uid } from './geometry';
-import { prepareImage, type PreparedImage } from './recognize';
+import { downscaleBlob, prepareImage, type PreparedImage } from './recognize';
 
 const MAX_PDF_PAGES = 40;
 const PAGE_PIXELS = 1_150_000;
@@ -51,7 +51,7 @@ async function openPdf(bytes: Uint8Array) {
   }
 }
 
-export async function pdfToPages(file: File, onProgress?: (done: number, total: number) => void): Promise<{ pages: MaterialPage[]; text: string; total: number }> {
+export async function pdfToPages(file: File, onProgress?: (done: number, total: number) => void, pixels = PAGE_PIXELS): Promise<{ pages: MaterialPage[]; text: string; total: number }> {
   let doc;
   try {
     doc = await openPdf(new Uint8Array(await file.arrayBuffer()));
@@ -65,7 +65,7 @@ export async function pdfToPages(file: File, onProgress?: (done: number, total: 
   for (let i = 1; i <= n; i++) {
     const page = await doc.getPage(i);
     const base = page.getViewport({ scale: 1 });
-    const scale = Math.min(3, Math.sqrt(PAGE_PIXELS / (base.width * base.height)));
+    const scale = Math.min(6, Math.sqrt(pixels / (base.width * base.height)));
     const vp = page.getViewport({ scale });
     const cv = document.createElement('canvas');
     cv.width = Math.round(vp.width);
@@ -114,8 +114,9 @@ export async function importMaterial(file: File, onProgress?: (msg: string) => v
 /** Файл → изображения для распознавания планировки (PDF — по картинке на страницу) */
 export async function fileToImages(file: File, onProgress?: (msg: string) => void): Promise<PreparedImage[]> {
   if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-    const { pages } = await pdfToPages(file, (d, t) => onProgress?.(`${file.name}: страница ${d} из ${t}`));
-    return Promise.all(pages.map(async (p, i) => ({ dataUrl: p.dataUrl, blob: await pageBlob(p), w: p.w, h: p.h, name: `${file.name}, стр. ${i + 1}`, text: p.text })));
+    // планировку раскладываем крупнее: мелкие стены и проёмы должны читаться; для ИИ — уменьшенная копия
+    const { pages } = await pdfToPages(file, (d, t) => onProgress?.(`${file.name}: страница ${d} из ${t}`), 4_500_000);
+    return Promise.all(pages.map(async (p, i) => ({ dataUrl: p.dataUrl, blob: await downscaleBlob(p.dataUrl, PAGE_PIXELS), w: p.w, h: p.h, name: `${file.name}, стр. ${i + 1}`, text: p.text })));
   }
   return [await prepareImage(file)];
 }

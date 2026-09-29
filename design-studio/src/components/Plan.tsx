@@ -153,7 +153,7 @@ export function Plan({
   const bounds =
     interactive && ul && !hasRooms ? { x: ul.x, y: ul.y, w: ul.pxW * ul.mPerPx, h: ul.pxH * ul.mPerPx } : roomBounds;
   const pad = 1.4;
-  const initial = useMemo(() => ({ x: bounds.x - pad, y: bounds.y - pad, w: bounds.w + pad * 2, h: bounds.h + pad * 2 }), [project.id, level, ul?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const initial = useMemo(() => ({ x: bounds.x - pad, y: bounds.y - pad, w: bounds.w + pad * 2, h: bounds.h + pad * 2 }), [project.id, level, ul?.id, hasRooms]); // eslint-disable-line react-hooks/exhaustive-deps
   const [vb, setVb] = useState(initial);
   useEffect(() => setVb(initial), [initial]);
   const view = fixedViewBox ? { x: bounds.x - pad, y: bounds.y - pad, w: bounds.w + pad * 2, h: bounds.h + pad * 2 } : vb;

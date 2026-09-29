@@ -211,45 +211,225 @@ export interface LocalResult {
   plan: RecognizedPlan;
   mPerPx: number;
   notes: string;
+  crop: { x0: number; y0: number; x1: number; y1: number };
+}
+
+export class ScaleNeeded extends Error {}
+
+/** Отладка: получить промежуточные маски */
+export const debugHook: { fn?: (name: string, m: Uint8Array | Int32Array, w: number, h: number) => void; log?: (s: string) => void } = {};
+
+/** Маски стен двумя способами: для заливки/штриховки стен и для мелких чертежей с подписями */
+function wallMasks(data: Uint8ClampedArray, w: number, h: number) {
+  const raw = new Uint8Array(w * h);
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) {
+    const lum = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+    raw[i] = lum < 165 ? 1 : 0;
+  }
+  const ro = Math.max(1, Math.round(Math.max(w, h) * 0.0018));
+  // A: сначала убираем тонкие линии (текст, дуги, размерные), затем сливаем штриховку
+  const a = erode(dilate(dilate(erode(raw, w, h, ro), w, h, ro), w, h, 1), w, h, 1);
+  removeSmall(a, w, h, Math.max(w, h) * 0.03);
+  // B: сначала сливаем штриховку, убираем отдельные подписи, затем тонкие линии
+  const b0 = erode(dilate(raw, w, h, 1), w, h, 1);
+  removeSmall(b0, w, h, Math.max(w, h) * 0.08);
+  const b = dilate(erode(b0, w, h, ro), w, h, ro);
+  // контур здания — по исходным линиям (остекление окон сохраняется), без отдельно стоящих подписей
+  const outline = erode(dilate(raw, w, h, 1), w, h, 1);
+  removeSmall(outline, w, h, Math.max(w, h) * 0.08);
+  const outside = outsideOf(outline, w, h);
+  return [a, b].map((m) => {
+    const out = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) out[i] = m[i] || outside[i] ? 1 : 0;
+    return out;
+  });
+}
+
+/** Область снаружи здания: заливка от края кадра по «закрытой» маске линий */
+function outsideOf(m: Uint8Array, w: number, h: number) {
+  const R = Math.max(2, Math.round(Math.max(w, h) * 0.02));
+  const closed = erode(dilate(m, w, h, R), w, h, R);
+  const outside = new Uint8Array(w * h);
+  const stack = new Int32Array(w * h);
+  let sp = 0;
+  const push = (i: number) => {
+    if (!closed[i] && !outside[i]) {
+      outside[i] = 1;
+      stack[sp++] = i;
+    }
+  };
+  for (let x = 0; x < w; x++) push(x), push((h - 1) * w + x);
+  for (let y = 0; y < h; y++) push(y * w), push(y * w + w - 1);
+  while (sp) {
+    const p = stack[--sp];
+    const x = p % w;
+    if (x > 0) push(p - 1);
+    if (x < w - 1) push(p + 1);
+    if (p >= w) push(p - w);
+    if (p < w * (h - 1)) push(p + w);
+  }
+  // возвращаем внешнюю зону к исходной границе (компенсируем закрытие)
+  return erode(outside, w, h, 1);
+}
+
+/** Где на листе сам план: самый крупный массив стен, не считая рамки листа */
+async function findPlanCrop(u: Underlay) {
+  const { data, w, h, k } = await loadImageData(u.dataUrl, { x0: 0, y0: 0, x1: u.pxW, y1: u.pxH }, 1200);
+  const raw = new Uint8Array(w * h);
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) raw[i] = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2] < 165 ? 1 : 0;
+  const m = dilate(erode(erode(dilate(raw, w, h, 1), w, h, 1), w, h, 1), w, h, 1);
+  const seen = new Uint8Array(w * h);
+  const stack = new Int32Array(w * h);
+  const comps: { n: number; x0: number; y0: number; x1: number; y1: number }[] = [];
+  for (let i = 0; i < w * h; i++) {
+    if (!m[i] || seen[i]) continue;
+    let sp = 0;
+    stack[sp++] = i;
+    seen[i] = 1;
+    let n = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+    while (sp) {
+      const p = stack[--sp];
+      n++;
+      const x = p % w;
+      const y = (p - x) / w;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      if (x > 0 && m[p - 1] && !seen[p - 1]) (seen[p - 1] = 1), (stack[sp++] = p - 1);
+      if (x < w - 1 && m[p + 1] && !seen[p + 1]) (seen[p + 1] = 1), (stack[sp++] = p + 1);
+      if (y > 0 && m[p - w] && !seen[p - w]) (seen[p - w] = 1), (stack[sp++] = p - w);
+      if (y < h - 1 && m[p + w] && !seen[p + w]) (seen[p + w] = 1), (stack[sp++] = p + w);
+    }
+    const bw = x1 - x0;
+    const bh = y1 - y0;
+    // рамка листа и таблицы — тонкие линии большого габарита с малой «массой»
+    if (bw > w * 0.8 && bh > h * 0.8) continue;
+    if (n < (bw + bh) * 2 || Math.max(bw, bh) < Math.max(w, h) * 0.02) continue;
+    comps.push({ n, x0, y0, x1, y1 });
+  }
+  if (!comps.length) return null;
+  // ядро — самая «тяжёлая» группа стен; присоединяем соседние группы, пока они рядом
+  comps.sort((a, b) => b.n - a.n);
+  const best = { ...comps[0] };
+  const used = new Set([0]);
+  for (let changed = true; changed; ) {
+    changed = false;
+    const gx = (best.x1 - best.x0) * 0.15 + 6;
+    const gy = (best.y1 - best.y0) * 0.15 + 6;
+    comps.forEach((c, i) => {
+      if (used.has(i) || c.x0 > best.x1 + gx || c.x1 < best.x0 - gx || c.y0 > best.y1 + gy || c.y1 < best.y0 - gy) return;
+      // не присоединяем то, что увеличит рамку до размеров листа (соседние чертежи)
+      const nx0 = Math.min(best.x0, c.x0), nx1 = Math.max(best.x1, c.x1), ny0 = Math.min(best.y0, c.y0), ny1 = Math.max(best.y1, c.y1);
+      if ((nx1 - nx0) * (ny1 - ny0) > (best.x1 - best.x0) * (best.y1 - best.y0) * 2.2 && c.n < best.n * 0.1) return;
+      Object.assign(best, { x0: nx0, x1: nx1, y0: ny0, y1: ny1 });
+      used.add(i);
+      changed = true;
+    });
+  }
+  const mx = (best.x1 - best.x0) * 0.04 + 4;
+  const my = (best.y1 - best.y0) * 0.04 + 4;
+  return {
+    x0: Math.max(0, Math.round((best.x0 - mx) / k)),
+    y0: Math.max(0, Math.round((best.y0 - my) / k)),
+    x1: Math.min(u.pxW, Math.round((best.x1 + mx) / k)),
+    y1: Math.min(u.pxH, Math.round((best.y1 + my) / k)),
+  };
 }
 
 /**
  * Распознаёт помещения на подложке. Координаты — в метрах в системе плана (с учётом положения подложки).
  */
 export async function recognizeLocally(u: Underlay): Promise<LocalResult> {
-  const crop = u.crop ?? { x0: 0, y0: 0, x1: u.pxW, y1: u.pxH };
-  const { data, w, h, k } = await loadImageData(u.dataUrl, crop, 900);
-  // стены: тёмные и насыщенно-серые пиксели
-  const raw = new Uint8Array(w * h);
-  for (let i = 0, p = 0; i < w * h; i++, p += 4) {
-    const lum = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
-    raw[i] = lum < 165 ? 1 : 0;
-  }
-  // штриховка стен сливается, затем «открытие» убирает тонкие линии: текст, дуги дверей, размерные линии
-  const closed = erode(dilate(raw, w, h, 1), w, h, 1);
-  // отдельно стоящие мелкие элементы (подписи, площади, значки) — не стены
-  removeSmall(closed, w, h, Math.max(w, h) * 0.2);
-  const ro = Math.max(2, Math.round(Math.max(w, h) * 0.003));
-  const wall = dilate(erode(closed, w, h, ro), w, h, ro);
+  const crop = u.crop ?? (await findPlanCrop(u)) ?? { x0: 0, y0: 0, x1: u.pxW, y1: u.pxH };
+  const { data, w, h, k } = await loadImageData(u.dataUrl, crop, 1400);
+  const masks = wallMasks(data, w, h);
+  masks.forEach((m, i) => debugHook.fn?.('wall ' + 'AB'[i], m, w, h));
 
   const minArea = w * h * 0.003;
   const target = parseExplication(u.text ?? '').length;
   const rMax = Math.max(4, Math.round(Math.max(w, h) * 0.05));
-  let best: { r: number; regions: Region[]; lab: Int32Array; score: number } | null = null;
-  for (let r = 1; r <= rMax; r++) {
-    const d = dilate(wall, w, h, r);
-    const { lab, regions } = label(d, w, h);
-    const rooms = regions.filter((g) => g.count >= minArea && g.count <= w * h * 0.6);
-    // если известно число помещений из экспликации — первый радиус, при котором оно достигнуто;
-    // иначе — наибольшее число помещений при наименьшем радиусе
-    const score = target ? -Math.abs(rooms.length - target) : rooms.length;
-    if (!best || score > best.score) best = { r, regions: rooms, lab, score };
-    if (target && rooms.length === target) break;
+  // многоуровневый поиск: при утолщении стен дверные проёмы закрываются и помещения отделяются друг от друга;
+  // каждое помещение фиксируется на том уровне, где оно впервые отделилось, затем дорастает до своих стен
+  const segment = (wall: Uint8Array) => {
+    const levels: { lab: Int32Array; regions: Region[] }[] = [];
+    for (let r = 0; r <= rMax; r++) {
+      const { lab, regions } = label(r ? dilate(wall, w, h, r) : wall, w, h);
+      // ядро маленькой комнаты при сильном утолщении стен небольшое — порог ниже итогового
+      levels.push({ lab, regions: regions.filter((g) => g.count >= Math.max(40, minArea * 0.2) && g.count <= w * h * 0.6) });
+    }
+    type Seed = { r: number; id: number; px: number };
+    let seeds: Seed[] = [];
+    for (let r = rMax; r >= 0; r--) {
+      const { lab, regions } = levels[r];
+      const next: Seed[] = [];
+      const claimed = new Map<number, Seed[]>();
+      for (const sd of seeds) {
+        const id = lab[sd.px];
+        if (!id) {
+          next.push(sd);
+          continue;
+        }
+        if (!claimed.has(id)) claimed.set(id, []);
+        claimed.get(id)!.push(sd);
+      }
+      for (const g of regions) {
+        const inside = claimed.get(g.id);
+        // точка внутри области для последующей проверки
+        let px = -1;
+        for (let y = g.y0; y <= g.y1 && px < 0; y++) for (let x = g.x0; x <= g.x1; x++) if (lab[y * w + x] === g.id) { px = y * w + x; break; }
+        if (!inside) next.push({ r, id: g.id, px });
+        else if (inside.length === 1) next.push({ r, id: g.id, px: inside[0].px });
+        else next.push(...inside);
+        claimed.delete(g.id);
+      }
+      for (const rest of claimed.values()) next.push(...rest);
+      seeds = next;
+    }
+    debugHook.log?.(`seeds ${seeds.length}`);
+    // рост от ядер по свободным пикселям
+    const grown = new Int32Array(w * h);
+    const q = new Int32Array(w * h);
+    let qh = 0;
+    let qt = 0;
+    seeds.forEach((sd, i) => {
+      const lab = levels[sd.r].lab;
+      for (let p = 0; p < w * h; p++) if (lab[p] === sd.id && !grown[p] && !wall[p]) (grown[p] = i + 1), (q[qt++] = p);
+    });
+    while (qh < qt) {
+      const p = q[qh++];
+      const x = p % w;
+      for (const nb of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, p - w, p + w]) {
+        if (nb < 0 || nb >= w * h || grown[nb] || wall[nb]) continue;
+        grown[nb] = grown[p];
+        q[qt++] = nb;
+      }
+    }
+    const regions: Region[] = seeds.map((_, i) => ({ id: i + 1, count: 0, x0: w, y0: h, x1: 0, y1: 0 }));
+    for (let i = 0; i < w * h; i++) {
+      const g = regions[grown[i] - 1];
+      if (!g) continue;
+      const x = i % w;
+      const y = (i - x) / w;
+      g.count++;
+      if (x < g.x0) g.x0 = x;
+      if (x > g.x1) g.x1 = x;
+      if (y < g.y0) g.y0 = y;
+      if (y > g.y1) g.y1 = y;
+    }
+    return { lab: grown, regions: regions.filter((g) => g.count >= minArea) };
+  };
+  let best: { regions: Region[]; lab: Int32Array; score: number } | null = null;
+  for (const wall of masks) {
+    const res = segment(wall);
+    const score = target ? -Math.abs(res.regions.length - target) : res.regions.length;
+    if (!best || score > best.score) best = { ...res, score };
   }
   if (!best || best.regions.length === 0) throw new Error('Не удалось найти замкнутые помещения. Обведите рамкой только сам план (без штампа и таблиц) или обведите помещения вручную.');
+  debugHook.fn?.('grown', best.lab, w, h);
 
   // прямоугольники помещений (Г-образные — двумя частями); координаты — по чистовым граням стен
-  const r = best.r;
+  const r = 0;
   const parts: { region: Region; x0: number; y0: number; x1: number; y1: number; part: number }[] = [];
   for (const g of best.regions) {
     const inside = (x: number, y: number) => best!.lab[y * w + x] === g.id;
@@ -275,11 +455,15 @@ export async function recognizeLocally(u: Underlay): Promise<LocalResult> {
     const areasPx = regionsSorted.slice(0, n).reduce((s, g) => s + pxArea(g.id), 0);
     mPerPxSmall = Math.sqrt(areasM / areasPx);
     notes = `Масштаб определён по экспликации (${rows.length} помещений в таблице, ${regionsSorted.length} найдено на чертеже).`;
+  } else if (u.totalArea && u.totalArea > 5) {
+    const areasPx = best.regions.reduce((s, g) => s + pxArea(g.id), 0);
+    mPerPxSmall = Math.sqrt(u.totalArea / areasPx);
+    notes = `Масштаб определён по общей площади ${u.totalArea} м².`;
   } else if (u.calibrated) {
     mPerPxSmall = u.mPerPx / k;
     notes = 'Масштаб взят из калибровки подложки.';
   } else {
-    throw new Error('Не удалось определить масштаб: в PDF нет таблицы площадей. Нажмите «Масштаб», кликните по концам размера с известной длиной, затем распознайте снова.');
+    throw new ScaleNeeded('Найдено помещений: ' + best.regions.length + '. Чтобы определить масштаб, введите общую площадь из экспликации (или задайте «Масштаб» по известному размеру).');
   }
 
   // имена по экспликации: ближайшая площадь
@@ -315,7 +499,7 @@ export async function recognizeLocally(u: Underlay): Promise<LocalResult> {
     const name = row ? row.name.charAt(0).toUpperCase() + row.name.slice(1) : ROOM_TYPES[type].label;
     return { name: p.part === 2 ? `${name} (часть 2)` : name, type, x: toX(p.x0 - half), y: toY(p.y0 - half), w: (p.x1 - p.x0 + 1 + 2 * half) * mPerPxSmall, d: (p.y1 - p.y0 + 1 + 2 * half) * mPerPxSmall };
   });
-  return { plan: { planBox: { x0: 0, y0: 0, x1: 1, y1: 1 }, width: 0, depth: 0, rooms: planRooms, openings: [] }, mPerPx, notes };
+  return { plan: { planBox: { x0: 0, y0: 0, x1: 1, y1: 1 }, width: 0, depth: 0, rooms: planRooms, openings: [] }, mPerPx, notes, crop };
 }
 
 /** Двери между соседними помещениями и окна на наружных стенах — чтобы модель была проходной */
@@ -359,7 +543,7 @@ export function autoOpenings(rooms: { id: string; type: RoomType; x: number; y: 
 const NO_WINDOW: RoomType[] = ['hall', 'wc', 'wardrobe', 'laundry'];
 
 /** Полный цикл без ИИ: помещения, двери, окна и уточнённый масштаб подложки */
-export async function buildFromUnderlay(u: Underlay, level: number): Promise<{ rooms: Room[]; openings: Opening[]; mPerPx: number; notes: string }> {
+export async function buildFromUnderlay(u: Underlay, level: number): Promise<{ rooms: Room[]; openings: Opening[]; mPerPx: number; notes: string; crop: LocalResult['crop'] }> {
   const res = await recognizeLocally(u);
   const { rooms } = planToRooms(res.plan, level);
   if (!rooms.length) throw new Error('Помещения не найдены — обведите рамкой сам план или нарисуйте помещения вручную');
@@ -374,5 +558,5 @@ export async function buildFromUnderlay(u: Underlay, level: number): Promise<{ r
     if (L < width + 0.4) continue;
     openings.push({ id: uid(), roomId: r.id, wall: sides[0], kind: 'window', offset: round2((L - width) / 2), width, height: r.type === 'bathroom' ? 0.7 : 1.5, sill: r.type === 'bathroom' ? 1.4 : 0.8 });
   }
-  return { rooms, openings, mPerPx: res.mPerPx, notes: res.notes };
+  return { rooms, openings, mPerPx: res.mPerPx, notes: res.notes, crop: res.crop };
 }
