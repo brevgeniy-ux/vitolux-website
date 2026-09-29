@@ -1579,3 +1579,11 @@ select.sm {
   border-radius: 3px;
   padding: 0 3px;
 }
+
+.tool-grid.three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.tool-grid.three .tool {
+  padding: 7px 2px;
+  font-size: 12.5px;
+}

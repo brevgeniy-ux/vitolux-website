@@ -7,6 +7,7 @@ import { DEFAULT_PROGRAM, TEMPLATES, emptyProject, projectFromProgram, projectFr
 import { furnishProject } from '../lib/autoFurnish';
 import { lightProject } from '../lib/lighting';
 import { aiConcept, aiStatus } from '../lib/api';
+import { aiMaxImages } from '../lib/ai';
 import { inArtifact } from '../lib/platform';
 import { ACCEPT_MATERIALS, fileToImages, importMaterial } from '../lib/materials';
 import { completeFromMaterials, reviewProject, sendChat } from '../lib/assistant';
@@ -37,6 +38,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [aiOk, setAiOk] = useState<boolean | null>(null);
+  const [aiImages, setAiImages] = useState(false);
   const [images, setImages] = useState<PreparedImage[]>([]);
   const [autoRecognize, setAutoRecognize] = useState(true);
   const [progress, setProgress] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     aiStatus().then(setAiOk);
+    aiMaxImages().then((n) => setAiImages(n > 0)).catch(() => setAiImages(false));
   }, []);
 
   const submit = async () => {
@@ -87,7 +90,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
         const failed: string[] = [];
         for (let i = 0; i < images.length; i++) {
           let plan: RecognizedPlan | undefined;
-          if (autoRecognize && aiOk) {
+          if (autoRecognize && aiOk && aiImages) {
             setProgress(images.length > 1 ? `Распознаю ${i + 1} этаж из ${images.length}… обычно 30–90 секунд` : 'Распознаю планировку… обычно 30–90 секунд');
             try {
               plan = await recognizePlan(images[i], kind, brief);
@@ -107,7 +110,7 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
         create(finalize(p, furnish && recognized, light && recognized));
         const st = useStore.getState();
         st.setView('plan');
-        if (!recognized) st.setTool('calibrate');
+        if (!recognized) st.setTool('crop');
         onClose();
         if (aiOk && recognized) {
           st.setAssistantOpen(true);
@@ -314,13 +317,13 @@ export function NewProjectWizard({ onClose }: { onClose: () => void }) {
                 <span>Подсказка для распознавания (необязательно)</span>
                 <input value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="Например: общая площадь 64 м², ширина гостиной 4,2 м" />
               </label>
-              {aiOk ? (
+              {aiOk && aiImages ? (
                 <label className="check">
                   <input type="checkbox" checked={autoRecognize} onChange={(e) => setAutoRecognize(e.target.checked)} /> Распознать помещения, двери и окна автоматически (Claude)
                 </label>
               ) : (
                 <p className="muted small">
-                  Автораспознавание недоступно{inArtifact() ? '' : ' (нужен ANTHROPIC_API_KEY на сервере)'}. Изображение станет подложкой: задайте масштаб по известному размеру и обведите помещения.
+                  {aiOk ? 'ИИ в этом окне не может смотреть изображения, поэтому' : 'ИИ не подключён, поэтому'} план распознается по линиям чертежа: после создания обведите рамкой сам план на листе и нажмите «Распознать помещения». Масштаб и названия помещений берутся из экспликации в PDF, если она есть, иначе задайте масштаб по известному размеру.
                 </p>
               )}
               <p className="muted small">После создания изображение остаётся подложкой под планом — по нему удобно проверить и поправить размеры.</p>

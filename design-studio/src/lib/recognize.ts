@@ -12,6 +12,7 @@ export interface PreparedImage {
   w: number;
   h: number;
   name: string;
+  text?: string;
 }
 
 /** Максимум ~1,15 Мп: такое изображение Claude получает без дополнительного уменьшения */
@@ -47,7 +48,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
 export function makeUnderlay(img: PreparedImage, level: number, planWidthM?: number): Underlay {
   // без калибровки считаем, что изображение покрывает ~12 м по ширине
   const mPerPx = (planWidthM ?? 12) / img.w;
-  return { id: uid(), level, dataUrl: img.dataUrl, pxW: img.w, pxH: img.h, x: 0, y: 0, mPerPx, opacity: 0.6, visible: true };
+  return { id: uid(), level, dataUrl: img.dataUrl, pxW: img.w, pxH: img.h, x: 0, y: 0, mPerPx, opacity: 0.6, visible: true, calibrated: Boolean(planWidthM), text: img.text };
 }
 
 // ---------- Ответ модели ----------

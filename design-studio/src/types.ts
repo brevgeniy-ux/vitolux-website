@@ -98,6 +98,12 @@ export interface Underlay {
   mPerPx: number;
   opacity: number;
   visible: boolean;
+  /** Масштаб задан пользователем или вычислен */
+  calibrated?: boolean;
+  /** Рамка вокруг самого плана на изображении, px */
+  crop?: { x0: number; y0: number; x1: number; y1: number };
+  /** Текст исходной страницы (экспликация помещений) */
+  text?: string;
 }
 
 /** Страница материала (PDF-страница или изображение), приведённая к картинке */
@@ -105,6 +111,8 @@ export interface MaterialPage {
   dataUrl: string;
   w: number;
   h: number;
+  /** Текст страницы (для PDF) — экспликация, подписи */
+  text?: string;
 }
 
 /** Материал от заказчика или прошлого дизайнера */

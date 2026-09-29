@@ -11,7 +11,8 @@ import { clamp, roomArea, round2, snap, uid, wallLength } from './geometry';
 import { furnishProject } from './autoFurnish';
 import { furnitureInRoom, lightProject, lightsInRoom, luxReport } from './lighting';
 import { generateLayout } from './layout';
-import { alignedUnderlay, planToRooms, recognizePlan } from './recognize';
+import { alignedUnderlay, makeUnderlay, planToRooms, recognizePlan } from './recognize';
+import { buildFromUnderlay } from './localRecognize';
 import { buildEstimate } from './estimate';
 import { pageBlob } from './materials';
 
@@ -392,8 +393,22 @@ async function runOne(tool: string, a: Record<string, unknown>, p: Project): Pro
       if (!pk) throw new Error(`страница ${String(a.page)} не найдена`);
       const pg = pk.m.pages[pk.i];
       const img = { dataUrl: pg.dataUrl, blob: await pageBlob(pg), w: pg.w, h: pg.h, name: pk.label };
-      const plan = await recognizePlan(img, p.kind, '');
       const lvl = useStore.getState().level;
+      if ((await aiMaxImages()) < 1) {
+        // ИИ не видит изображений — распознаём по линиям чертежа
+        const u = { ...makeUnderlay({ ...img, text: pg.text }, lvl), calibrated: false };
+        const res = await buildFromUnderlay(u, lvl);
+        mutate((pr) => {
+          const old = new Set(pr.rooms.filter((r) => r.level === lvl).map((r) => r.id));
+          pr.rooms = pr.rooms.filter((r) => !old.has(r.id)).concat(res.rooms);
+          pr.openings = pr.openings.filter((o) => !old.has(o.roomId)).concat(res.openings);
+          pr.underlays = (pr.underlays ?? []).filter((x) => x.level !== lvl).concat({ ...u, mPerPx: res.mPerPx, calibrated: true, opacity: 0.45 });
+          pr.furniture = furnishProject(pr, res.rooms.map((r) => r.id));
+          pr.lights = lightProject(pr, res.rooms.map((r) => r.id));
+        });
+        return `Распознана планировка по линиям чертежа (${pk.label}): ${res.rooms.length} помещений. ${res.notes}`;
+      }
+      const plan = await recognizePlan(img, p.kind, '');
       const { rooms, openings } = planToRooms(plan, lvl);
       if (!rooms.length) throw new Error('помещения на странице не найдены');
       mutate((pr) => {
@@ -489,7 +504,13 @@ export async function sendChat(text: string, attachments: string[] = []) {
   const imageNote = images.length ? `\n\nК сообщению приложены изображения по порядку: ${images.map((im, i) => `${i + 1}) ${im.label}`).join('; ')}.` : '';
   const system = `${ROLE}\n\nКаталоги:\n${catalogs()}\n\nТекущий проект (координаты в метрах, x вправо, y вниз):\n${projectContext(project)}\n\nМатериалы проекта:\n${materialsContext(project)}`;
   const turns = chatHistory(project);
-  turns[turns.length - 1] = { role: 'user', content: turns[turns.length - 1].content + imageNote + (dropped ? `\n(Ещё ${dropped} изображений не поместились в запрос.)` : '') };
+  const noVision = dropped > 0 && images.length === 0 && (await aiMaxImages()) === 0;
+  const dropNote = noVision
+    ? `\n(Служебно: пользователь приложил ${dropped} изображений, но в этом окне ты их не видишь. Честно скажи об этом и попроси описать словами, что нравится: цвета, материалы, мебель, настроение. Планировку можно распознать кнопкой «Распознать помещения» на вкладке «План».)`
+    : dropped
+      ? `\n(Ещё ${dropped} изображений не поместились в запрос.)`
+      : '';
+  turns[turns.length - 1] = { role: 'user', content: turns[turns.length - 1].content + imageNote + dropNote };
   try {
     const res = await aiJson<ChatReply>({ system, turns, images: images.map((i) => i.blob), schema: CHAT_SCHEMA, example: CHAT_EXAMPLE, depth: images.length ? 'deep' : 'normal' });
     const actions = Array.isArray(res.actions) ? res.actions.filter((a) => a && typeof a.tool === 'string') : [];

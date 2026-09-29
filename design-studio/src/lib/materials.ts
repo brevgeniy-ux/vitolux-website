@@ -74,14 +74,18 @@ export async function pdfToPages(file: File, onProgress?: (done: number, total: 
     g.fillStyle = '#fff';
     g.fillRect(0, 0, cv.width, cv.height);
     await page.render({ canvasContext: g, viewport: vp }).promise;
-    pages.push({ dataUrl: cv.toDataURL('image/jpeg', 0.85), w: cv.width, h: cv.height });
+    const page_: MaterialPage = { dataUrl: cv.toDataURL('image/jpeg', 0.85), w: cv.width, h: cv.height };
+    pages.push(page_);
     const tc = await page.getTextContent();
     const t = tc.items
       .map((it) => ('str' in it ? it.str : ''))
       .join(' ')
       .replace(/\s+/g, ' ')
       .trim();
-    if (t) texts.push(`[стр. ${i}] ${t}`);
+    if (t) {
+      texts.push(`[стр. ${i}] ${t}`);
+      page_.text = t;
+    }
     onProgress?.(i, n);
   }
   await doc.destroy();
@@ -111,7 +115,7 @@ export async function importMaterial(file: File, onProgress?: (msg: string) => v
 export async function fileToImages(file: File, onProgress?: (msg: string) => void): Promise<PreparedImage[]> {
   if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
     const { pages } = await pdfToPages(file, (d, t) => onProgress?.(`${file.name}: страница ${d} из ${t}`));
-    return Promise.all(pages.map(async (p, i) => ({ dataUrl: p.dataUrl, blob: await pageBlob(p), w: p.w, h: p.h, name: `${file.name}, стр. ${i + 1}` })));
+    return Promise.all(pages.map(async (p, i) => ({ dataUrl: p.dataUrl, blob: await pageBlob(p), w: p.w, h: p.h, name: `${file.name}, стр. ${i + 1}`, text: p.text })));
   }
   return [await prepareImage(file)];
 }

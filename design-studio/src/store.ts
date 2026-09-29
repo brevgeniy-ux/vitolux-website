@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Project, Selection } from './types';
 import { db } from './lib/db';
 
-export type Tool = 'select' | 'room' | 'door' | 'window' | 'calibrate' | 'underlay';
+export type Tool = 'select' | 'room' | 'door' | 'window' | 'calibrate' | 'underlay' | 'crop';
 export type View = 'plan' | '3d' | 'split' | 'docs';
 
 interface State {

@@ -12,7 +12,8 @@ type Drag =
   | { kind: 'furniture' | 'light'; id: string; start: Pt; orig: Pt }
   | { kind: 'opening'; id: string; start: Pt; orig: number }
   | { kind: 'draw'; start: Pt; cur: Pt }
-  | { kind: 'underlay'; id: string; start: Pt; orig: Pt };
+  | { kind: 'underlay'; id: string; start: Pt; orig: Pt }
+  | { kind: 'crop'; start: Pt; cur: Pt };
 
 /** Притягивание к краям соседних помещений */
 function magnet(project: Project, room: Room, x: number, y: number, w: number, d: number) {
@@ -62,6 +63,12 @@ export function PlanEditor() {
   const underlayDown = (p: Pt, e: React.PointerEvent) => {
     if (tool === 'calibrate') {
       setCalib(calib.length >= 2 ? [p] : [...calib, p]);
+      return true;
+    }
+    if (tool === 'crop' && underlay) {
+      capture(e);
+      drag.current = { kind: 'crop', start: p, cur: p };
+      setDraft({ a: p, b: p });
       return true;
     }
     if (tool === 'underlay' && underlay) {
@@ -234,6 +241,11 @@ export function PlanEditor() {
               );
               break;
             }
+            case 'crop': {
+              d.cur = p;
+              setDraft({ a: d.start, b: p });
+              break;
+            }
             case 'draw': {
               d.cur = { x: snap(p.x, 0.1), y: snap(p.y, 0.1) };
               setDraft({ a: d.start, b: d.cur });
@@ -322,6 +334,22 @@ export function PlanEditor() {
         onUp: () => {
           const d = drag.current;
           drag.current = null;
+          if (d?.kind === 'crop' && underlay) {
+            setDraft(null);
+            const toPx = (v: number, o: number) => (v - o) / underlay.mPerPx;
+            const x0 = clamp(Math.min(toPx(d.start.x, underlay.x), toPx(d.cur.x, underlay.x)), 0, underlay.pxW);
+            const x1 = clamp(Math.max(toPx(d.start.x, underlay.x), toPx(d.cur.x, underlay.x)), 0, underlay.pxW);
+            const y0 = clamp(Math.min(toPx(d.start.y, underlay.y), toPx(d.cur.y, underlay.y)), 0, underlay.pxH);
+            const y1 = clamp(Math.max(toPx(d.start.y, underlay.y), toPx(d.cur.y, underlay.y)), 0, underlay.pxH);
+            if (x1 - x0 > 30 && y1 - y0 > 30) {
+              mutate((pr) => {
+                const u = pr.underlays?.find((x) => x.id === underlay.id);
+                if (u) u.crop = { x0: Math.round(x0), y0: Math.round(y0), x1: Math.round(x1), y1: Math.round(y1) };
+              });
+              setTool('select');
+            }
+            return;
+          }
           if (d?.kind === 'draw') {
             setDraft(null);
             const x = Math.min(d.start.x, d.cur.x);

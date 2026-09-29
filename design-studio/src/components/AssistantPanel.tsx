@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import type { Material } from '../types';
 import { STYLES } from '../data/styles';
-import { aiAvailable } from '../lib/ai';
+import { aiAvailable, aiMaxImages } from '../lib/ai';
 import { completeFromMaterials, createVariant, greeting, sendChat } from '../lib/assistant';
 import { prepareImage } from '../lib/recognize';
 import { ACCEPT_MATERIALS, importMaterial } from '../lib/materials';
@@ -33,8 +33,10 @@ export function AssistantPanel() {
   const chat = project.chat ?? [];
   const mats = project.materials ?? [];
 
+  const [vision, setVision] = useState(true);
   useEffect(() => {
     aiAvailable().then(setAi);
+    aiMaxImages().then((n) => setVision(n > 0)).catch(() => setVision(false));
   }, []);
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -123,6 +125,11 @@ export function AssistantPanel() {
         {ai === false && (
           <div className="hint warn">
             {inArtifact() ? 'Claude недоступен на этой странице.' : 'ИИ не подключён: запустите сервер с ANTHROPIC_API_KEY (см. .env.example).'}
+          </div>
+        )}
+        {ai && !vision && (
+          <div className="hint">
+            В этом окне ИИ не видит изображения. Опишите словами, что нравится на скриншотах (цвета, материалы, мебель), а планировку распознайте кнопкой «Распознать помещения» на вкладке «План» — она работает без ИИ.
           </div>
         )}
         {mats.some((m) => m.kind !== 'reference') && (

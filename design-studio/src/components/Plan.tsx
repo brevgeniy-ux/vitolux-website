@@ -255,7 +255,21 @@ export function Plan({
       {interactive && <rect data-bg="1" x={view.x - 100} y={view.y - 100} width={view.w + 200} height={view.h + 200} fill="url(#grid5)" />}
 
       {underlays.map((u) => (
-        <image key={u.id} href={u.dataUrl} x={u.x} y={u.y} width={u.pxW * u.mPerPx} height={u.pxH * u.mPerPx} opacity={u.opacity} preserveAspectRatio="none" pointerEvents="none" />
+        <g key={u.id} pointerEvents="none">
+          <image href={u.dataUrl} x={u.x} y={u.y} width={u.pxW * u.mPerPx} height={u.pxH * u.mPerPx} opacity={u.opacity} preserveAspectRatio="none" />
+          {u.crop && (
+            <rect
+              x={u.x + u.crop.x0 * u.mPerPx}
+              y={u.y + u.crop.y0 * u.mPerPx}
+              width={(u.crop.x1 - u.crop.x0) * u.mPerPx}
+              height={(u.crop.y1 - u.crop.y0) * u.mPerPx}
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth={Math.max(0.03, u.mPerPx * 3)}
+              strokeDasharray={`${u.mPerPx * 12} ${u.mPerPx * 8}`}
+            />
+          )}
+        </g>
       ))}
 
       {/* Помещения */}
