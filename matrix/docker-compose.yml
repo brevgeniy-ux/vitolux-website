@@ -1,0 +1,102 @@
+# Приватный мессенджер для заявок: Matrix (Synapse) + Element + шлюз вебхуков.
+# Все образы собраны под arm64 и работают на Apple Silicon (OrbStack / Docker Desktop).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: matrix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: synapse
+      # Synapse требует именно такую локаль БД
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: matrix-synapse
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+      UID: "1000"
+      GID: "1000"
+    volumes:
+      - ./data/synapse:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  element:
+    image: vectorim/element-web:latest
+    container_name: matrix-element
+    restart: unless-stopped
+    volumes:
+      - ./data/element/config.json:/app/config.json:ro
+
+  gateway:
+    build: ./gateway
+    container_name: matrix-gateway
+    restart: unless-stopped
+    depends_on:
+      synapse:
+        condition: service_healthy
+    environment:
+      HOMESERVER_URL: http://synapse:8008
+      PROJECTS_FILE: /data/projects.json
+      PORT: "8080"
+    volumes:
+      - ./data/gateway:/data
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: matrix-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MATRIX_DOMAIN: ${MATRIX_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+    depends_on:
+      - synapse
+      - element
+      - gateway
+
+  # Одноразовая утилита: создаёт админа, ботов, пространства и комнаты по projects.json.
+  # Запуск: docker compose run --rm bootstrap
+  bootstrap:
+    image: node:22-alpine
+    container_name: matrix-bootstrap
+    profiles: ["tools"]
+    working_dir: /app
+    command: ["node", "bootstrap.js"]
+    environment:
+      HOMESERVER_URL: http://synapse:8008
+      MATRIX_DOMAIN: ${MATRIX_DOMAIN}
+      REGISTRATION_SHARED_SECRET: ${REGISTRATION_SHARED_SECRET}
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PROJECTS_INPUT: /app/projects.json
+      PROJECTS_OUTPUT: /data/projects.json
+    volumes:
+      - ./bootstrap:/app
+      - ./data/gateway:/data
+    depends_on:
+      synapse:
+        condition: service_healthy

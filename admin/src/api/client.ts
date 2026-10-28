@@ -90,6 +90,9 @@ export interface Settings {
   telegram_bot_token: string
   telegram_chat_id: string
   telegram_notifications_enabled: string
+  matrix_webhook_url: string
+  matrix_webhook_secret: string
+  matrix_notifications_enabled: string
   free_delivery_threshold: string
   delivery_cost: string
 }
@@ -146,6 +149,7 @@ export const settingsApi = {
   getAll: () => apiClient.get('/settings'),
   update: (data: Partial<Settings>) => apiClient.put('/admin/settings', data),
   testTelegram: () => apiClient.post('/admin/settings/test-telegram'),
+  testMatrix: () => apiClient.post('/admin/settings/test-matrix'),
 }
 
 // Dashboard API — с /admin

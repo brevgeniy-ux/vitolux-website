@@ -1,0 +1,34 @@
+{
+  "default_server_config": {
+    "m.homeserver": {
+      "base_url": "https://MATRIX_DOMAIN",
+      "server_name": "MATRIX_DOMAIN"
+    }
+  },
+  "brand": "Заявки",
+  "default_country_code": "UA",
+  "disable_custom_urls": true,
+  "disable_guests": true,
+  "disable_3pid_login": true,
+  "disable_login_language_selector": false,
+  "show_labs_settings": false,
+  "default_theme": "light",
+  "room_directory": { "servers": [] },
+  "integrations_ui_url": null,
+  "integrations_rest_url": null,
+  "integrations_widgets_urls": [],
+  "bug_report_endpoint_url": null,
+  "map_style_url": null,
+  "features": {
+    "feature_spaces": true
+  },
+  "setting_defaults": {
+    "breadcrumbs": true,
+    "UIFeature.feedback": false,
+    "UIFeature.identityServer": false,
+    "UIFeature.thirdPartyId": false,
+    "UIFeature.registration": false,
+    "UIFeature.shareSocial": false,
+    "UIFeature.urlPreviews": false
+  }
+}

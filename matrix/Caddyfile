@@ -1,0 +1,40 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$MATRIX_DOMAIN} {
+	encode zstd gzip
+
+	# Клиенты находят сервер по этому файлу
+	handle /.well-known/matrix/client {
+		header Content-Type application/json
+		header Access-Control-Allow-Origin *
+		respond `{"m.homeserver":{"base_url":"https://{$MATRIX_DOMAIN}"}}` 200
+	}
+
+	# Matrix API
+	handle /_matrix/* {
+		reverse_proxy synapse:8008
+	}
+	handle /_synapse/client/* {
+		reverse_proxy synapse:8008
+	}
+
+	# Админский API Synapse наружу не отдаём: он доступен только из docker-сети
+	handle /_synapse/admin/* {
+		respond "forbidden" 403
+	}
+
+	# Вебхуки заявок
+	handle /hook/* {
+		reverse_proxy gateway:8080
+	}
+	handle /hook-health {
+		reverse_proxy gateway:8080
+	}
+
+	# Веб-версия Element
+	handle {
+		reverse_proxy element:80
+	}
+}

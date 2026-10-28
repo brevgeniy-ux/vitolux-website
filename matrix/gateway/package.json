@@ -1,0 +1,13 @@
+{
+  "name": "matrix-lead-gateway",
+  "version": "1.0.0",
+  "description": "Принимает вебхуки с заявками и публикует их в комнаты Matrix от имени бота проекта",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}

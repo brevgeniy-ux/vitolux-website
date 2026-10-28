@@ -30,6 +30,59 @@ try {
     exit;
 }
 
+// Функция отправки уведомлений в собственный Matrix-мессенджер (см. matrix/README.md)
+function sendMatrixNotification($message, $channel = 'default') {
+    global $pdo;
+
+    try {
+        $stmt = $pdo->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('matrix_webhook_url', 'matrix_webhook_secret', 'matrix_notifications_enabled')");
+        $settings = [];
+        while ($row = $stmt->fetch()) {
+            $settings[$row['setting_key']] = $row['setting_value'];
+        }
+
+        if (empty($settings['matrix_notifications_enabled']) || $settings['matrix_notifications_enabled'] !== 'true') {
+            return false;
+        }
+        if (empty($settings['matrix_webhook_url']) || empty($settings['matrix_webhook_secret'])) {
+            return false;
+        }
+
+        // Сообщения сформированы в Telegram-разметке (<b>, переводы строк): шлюзу отдаём и текст, и HTML
+        $payload = [
+            'source' => 'Сайт VitoluxUA',
+            'channel' => $channel,
+            'text' => trim(strip_tags($message)),
+            'html' => nl2br($message),
+        ];
+
+        $ch = curl_init($settings['matrix_webhook_url']);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'X-Hook-Secret: ' . $settings['matrix_webhook_secret'],
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return $httpCode === 200;
+    } catch (Exception $e) {
+        error_log("Matrix notification error: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Отправка заявки во все включённые каналы (Telegram и/или Matrix)
+function sendLeadNotification($message, $channel = 'default') {
+    $telegram = sendTelegramNotification($message);
+    $matrix = sendMatrixNotification($message, $channel);
+    return $telegram || $matrix;
+}
+
 // Функция отправки Telegram уведомлений
 function sendTelegramNotification($message) {
     global $pdo;
@@ -340,7 +393,7 @@ try {
         $message .= "💳 Оплата: {$input['payment_type']}\n";
         $message .= "\n🕐 " . date('d.m.Y H:i');
         
-        sendTelegramNotification($message);
+        sendLeadNotification($message, 'orders');
         
         echo json_encode(['id' => $orderId, 'order_number' => $orderNumber, 'message' => 'Order created']);
     }
@@ -407,7 +460,7 @@ try {
                 $message .= "📞 {$order['customer_phone']}\n";
                 $message .= "\n🕐 " . date('d.m.Y H:i');
                 
-                sendTelegramNotification($message);
+                sendLeadNotification($message, 'status');
             }
             
             echo json_encode(['message' => 'Order updated']);
@@ -436,6 +489,11 @@ try {
         elseif ($requestMethod === 'POST' && isset($pathParts[2]) && $pathParts[2] === 'test-telegram') {
             $message = "🧪 <b>Тестове повідомлення</b>\n\nЦе тестове повідомлення від VitoluxUA API.\nЯкщо ви бачите це повідомлення, Telegram інтеграція працює правильно! ✅";
             $result = sendTelegramNotification($message);
+            echo json_encode(['success' => $result, 'message' => $result ? 'Message sent' : 'Failed to send']);
+        }
+        elseif ($requestMethod === 'POST' && isset($pathParts[2]) && $pathParts[2] === 'test-matrix') {
+            $message = "🧪 <b>Тестове повідомлення</b>\n\nЦе тестове повідомлення від VitoluxUA API.\nЯкщо ви бачите це повідомлення, Matrix інтеграція працює правильно! ✅";
+            $result = sendMatrixNotification($message);
             echo json_encode(['success' => $result, 'message' => $result ? 'Message sent' : 'Failed to send']);
         }
     }

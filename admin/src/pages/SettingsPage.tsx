@@ -7,6 +7,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testingTelegram, setTestingTelegram] = useState(false)
+  const [testingMatrix, setTestingMatrix] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -49,6 +50,22 @@ export default function SettingsPage() {
       toast.error('Помилка відправки тестового повідомлення')
     } finally {
       setTestingTelegram(false)
+    }
+  }
+
+  const handleTestMatrix = async () => {
+    setTestingMatrix(true)
+    try {
+      const res = await settingsApi.testMatrix()
+      if (res.data.success) {
+        toast.success('Тестове повідомлення надіслано!')
+      } else {
+        toast.error('Помилка відправки. Перевірте URL та секрет вебхука.')
+      }
+    } catch (error) {
+      toast.error('Помилка відправки тестового повідомлення')
+    } finally {
+      setTestingMatrix(false)
     }
   }
 
@@ -143,6 +160,55 @@ export default function SettingsPage() {
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
             >
               {testingTelegram ? 'Відправка...' : 'Надіслати тестове повідомлення'}
+            </button>
+          </div>
+        </div>
+
+        {/* Matrix (власний месенджер) */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold mb-4">Власний месенджер (Matrix)</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Заявки надсилаються на вебхук вашого Matrix-сервера. URL і секрет видає скрипт bootstrap (див. matrix/README.md).
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2 font-semibold">URL вебхука</label>
+              <input
+                type="text"
+                value={settings.matrix_webhook_url || ''}
+                onChange={(e) => setSettings({ ...settings, matrix_webhook_url: e.target.value })}
+                className="w-full border rounded p-2"
+                placeholder="https://chat.example.com/hook/vitolux"
+              />
+            </div>
+            <div>
+              <label className="block mb-2 font-semibold">Секрет вебхука</label>
+              <input
+                type="password"
+                value={settings.matrix_webhook_secret || ''}
+                onChange={(e) => setSettings({ ...settings, matrix_webhook_secret: e.target.value })}
+                className="w-full border rounded p-2"
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.matrix_notifications_enabled === 'true'}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  matrix_notifications_enabled: e.target.checked ? 'true' : 'false'
+                })}
+                className="mr-2"
+              />
+              <label>Увімкнути сповіщення</label>
+            </div>
+            <button
+              onClick={handleTestMatrix}
+              disabled={testingMatrix}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            >
+              {testingMatrix ? 'Відправка...' : 'Надіслати тестове повідомлення'}
             </button>
           </div>
         </div>

@@ -1,0 +1,75 @@
+# Конфигурация Synapse для приватного сервера заявок.
+# Файл генерируется скриптом init.sh из этого шаблона; правьте шаблон, а не результат.
+
+server_name: "MATRIX_DOMAIN"
+public_baseurl: "https://MATRIX_DOMAIN/"
+pid_file: /data/homeserver.pid
+report_stats: false
+serve_server_wellknown: false
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['0.0.0.0']
+    resources:
+      - names: [client]
+        compress: false
+
+database:
+  name: psycopg2
+  args:
+    user: synapse
+    password: "POSTGRES_PASSWORD"
+    database: synapse
+    host: postgres
+    cp_min: 5
+    cp_max: 10
+
+log_config: "/data/MATRIX_DOMAIN.log.config"
+media_store_path: /data/media_store
+signing_key_path: "/data/MATRIX_DOMAIN.signing.key"
+
+# Пользователей создаёт только bootstrap-скрипт, открытой регистрации нет
+enable_registration: false
+registration_shared_secret: "REGISTRATION_SHARED_SECRET"
+
+# Полностью закрытый сервер: никакой федерации с другими Matrix-серверами
+# и никаких запросов к matrix.org за ключами
+federation_domain_whitelist: []
+trusted_key_servers: []
+suppress_key_server_warning: true
+allow_public_rooms_over_federation: false
+allow_public_rooms_without_auth: false
+
+# Пуш-уведомления на телефон: отправляем только сигнал "есть событие",
+# без текста заявки. Приложение само забирает содержимое с нашего сервера.
+push:
+  include_content: false
+
+# Не ходим во внешний интернет за превью ссылок
+url_preview_enabled: false
+
+# Лимит вложений (сканы, фото от клиентов)
+max_upload_size: 50M
+
+# Чуть мягче лимиты для ботов, которые шлют много заявок подряд
+rc_message:
+  per_second: 10
+  burst_count: 50
+
+# Боты создают комнаты и приглашают сотрудников пачками при настройке
+rc_invites:
+  per_room: { per_second: 1, burst_count: 30 }
+  per_user: { per_second: 1, burst_count: 30 }
+  per_issuer: { per_second: 1, burst_count: 30 }
+rc_joins:
+  local: { per_second: 1, burst_count: 30 }
+
+# Пресет для комнат, которые создаёт бот: приглашения только
+room_list_publication_rules:
+  - action: deny
+
+retention:
+  enabled: false

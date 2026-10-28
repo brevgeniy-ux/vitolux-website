@@ -44,6 +44,9 @@ INSERT INTO settings (setting_key, setting_value, setting_type) VALUES
 ('telegram_bot_token', '', 'string'),
 ('telegram_chat_id', '', 'string'),
 ('telegram_notifications_enabled', 'false', 'boolean'),
+('matrix_webhook_url', '', 'string'),
+('matrix_webhook_secret', '', 'string'),
+('matrix_notifications_enabled', 'false', 'boolean'),
 ('free_delivery_threshold', '2000', 'number'),
 ('delivery_cost', '100', 'number')
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);

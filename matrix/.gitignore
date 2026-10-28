@@ -1,0 +1,6 @@
+# Секреты и данные сервера не попадают в git
+.env
+data/
+bootstrap/projects.json
+bootstrap/avatars/*
+!bootstrap/avatars/README.md

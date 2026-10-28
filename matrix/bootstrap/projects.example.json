@@ -1,0 +1,35 @@
+{
+  "_comment": "Список проектов. Для каждого создаётся бот, пространство (Space) и комнаты. members — логины сотрудников, которых добавить в проект; admin из .env добавляется везде автоматически.",
+  "projects": [
+    {
+      "slug": "norma-costing",
+      "name": "Норма Костинг",
+      "bot_name": "Норма Костинг · Заявки",
+      "avatar": "avatars/norma-costing.png",
+      "rooms": {
+        "default": "Все заявки"
+      },
+      "members": []
+    },
+    {
+      "slug": "naos",
+      "name": "Наос",
+      "bot_name": "Наос · Заявки",
+      "rooms": {
+        "default": "Все заявки"
+      },
+      "members": []
+    },
+    {
+      "slug": "vitolux",
+      "name": "Vitolux",
+      "bot_name": "Vitolux · Заявки",
+      "rooms": {
+        "default": "Все заявки",
+        "orders": "Замовлення",
+        "status": "Статуси замовлень"
+      },
+      "members": []
+    }
+  ]
+}
